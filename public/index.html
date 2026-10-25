@@ -1164,8 +1164,14 @@ function renderAdmin() {
         if (!res.ok) { const d = await res.json().catch(()=>({})); throw new Error(d.error || "导出失败"); }
         const blob = await res.blob();
         const cd = res.headers.get("Content-Disposition") || "";
-        const m = cd.match(/filename="?([^"]+)"?/);
-        const fname = m ? m[1] : "导出文件";
+        // 优先解析 RFC 5987 的 filename*（中文名），回退到普通 filename
+        let fname = "";
+        const mStar = cd.match(/filename\*=UTF-8''([^;]+)/i);
+        if (mStar) { try { fname = decodeURIComponent(mStar[1]); } catch (e) { fname = mStar[1]; } }
+        if (!fname) {
+          const m = cd.match(/filename="?([^"]+)"?/);
+          fname = m ? m[1] : "导出文件";
+        }
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a"); a.href = url; a.download = fname; a.click();
         setTimeout(() => URL.revokeObjectURL(url), 3000);

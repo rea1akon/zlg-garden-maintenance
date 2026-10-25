@@ -25,6 +25,14 @@ function now() {
   return new Date().toISOString();
 }
 
+// 生成合规的 Content-Disposition 头（中文文件名用 RFC 5987 filename* 编码，
+// 避免浏览器 Fetch 规范因非 ASCII 头值抛 TypeError）
+function contentDisposition(filename) {
+  const asciiFallback = filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
+  const encoded = encodeURIComponent(filename).replace(/['()]/g, escape).replace(/\*/g, "%2A");
+  return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encoded}`;
+}
+
 // 东八区本地日期 YYYY-MM-DD（禁止 toISOString，避免凌晨 0-8 点早一天）
 function localDate(d = new Date()) {
   const y = d.getFullYear();
@@ -428,14 +436,17 @@ async function photoAllowed(env, user, key) {
   } catch (e) {}
 
   // 本范围记录引用（等值比对）
+  // 注意：D1 中匿名 ? 与命名 ?1 不可混用；这里统一用命名序号占位符，
+  // scope_id 占 ?1，key 占 ?2，避免 "Wrong number of parameter bindings"。
   const filter = scopeOfficeFilter(user);
+  const scopeParam = filter.params.length ? filter.params[0] : null;
   const row = await env.DB.prepare(
     `SELECT 1 AS x FROM daily_records
-      WHERE ${filter.where}
-        AND (EXISTS (SELECT 1 FROM json_each(daily_records.photos_before) AS a WHERE json_extract(a.value,'$.key') = ?1)
-          OR EXISTS (SELECT 1 FROM json_each(daily_records.photos_after)  AS b WHERE json_extract(b.value,'$.key') = ?1))
+      WHERE office_id = ?1
+        AND (EXISTS (SELECT 1 FROM json_each(daily_records.photos_before) AS a WHERE json_extract(a.value,'$.key') = ?2)
+          OR EXISTS (SELECT 1 FROM json_each(daily_records.photos_after)  AS b WHERE json_extract(b.value,'$.key') = ?2))
       LIMIT 1`
-  ).bind(...filter.params, key).first();
+  ).bind(scopeParam, key).first();
   return !!row;
 }
 
@@ -949,7 +960,7 @@ async function exportCsv(env, url) {
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="养护日志_${from || "all"}_${to || "all"}.csv"`,
+      "Content-Disposition": contentDisposition(`养护日志_${from || "all"}_${to || "all"}.csv`),
     },
   });
 }
@@ -1003,7 +1014,7 @@ async function exportPhotosZip(env, url) {
   return new Response(zip, {
     headers: {
       "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="养护照片_${from || "all"}_${to || "all"}.zip"`,
+      "Content-Disposition": contentDisposition(`养护照片_${from || "all"}_${to || "all"}.zip`),
     },
   });
 }
