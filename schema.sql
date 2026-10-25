@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   id            TEXT PRIMARY KEY,
   username      TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,                -- pbkdf2$10000$<salt-b64>$<hash-b64>
+  password_plain TEXT,                        -- 明文密码（管理员查看/管理用）
   display_name  TEXT NOT NULL,
   role          TEXT NOT NULL DEFAULT 'unit', -- 'admin' | 'reviewer' | 'unit'
   scope_type    TEXT NOT NULL DEFAULT 'all',  -- 'all' | 'office'
@@ -124,8 +125,8 @@ CREATE INDEX IF NOT EXISTS idx_plans_office ON plans(office_id);
 -- ============================================================
 
 -- 默认管理员：admin / Admin@123（首次登录强制改密）
-INSERT INTO users (id, username, password_hash, display_name, role, scope_type, scope_id, must_change_pwd, enabled, created_at, updated_at)
-VALUES ('u-admin', 'admin', 'pbkdf2$10000$Z60ohSn3TrpIJyOc5yGI4A==$2UcJwaNSS2JEQA17AlHSrbwiv6mSLDYOpp8+fAYs7jg=', '系统管理员', 'admin', 'all', NULL, 1, 1, datetime('now'), datetime('now'));
+INSERT INTO users (id, username, password_hash, password_plain, display_name, role, scope_type, scope_id, must_change_pwd, enabled, created_at, updated_at)
+VALUES ('u-admin', 'admin', 'pbkdf2$10000$Z60ohSn3TrpIJyOc5yGI4A==$2UcJwaNSS2JEQA17AlHSrbwiv6mSLDYOpp8+fAYs7jg=', 'Admin@123', '系统管理员', 'admin', 'all', NULL, 1, 1, datetime('now'), datetime('now'));
 
 -- 游客访问密码：默认 666666
 INSERT INTO settings (key, value) VALUES ('visitor_password', 'pbkdf2$10000$v4giJf3Ibq2refEOGAulsA==$Hd5XD2u8W/CVgvlQPc16RIYnNV45BwnAVXw+TmX2oOk=');

@@ -292,8 +292,8 @@ async function changePassword(request, env, user) {
     if (!(await verifyPassword(old_password, cur.password_hash))) return fail("旧密码错误", 400);
   }
   const hash = await makePassword(new_password);
-  await env.DB.prepare("UPDATE users SET password_hash = ?1, must_change_pwd = 0, updated_at = ?2 WHERE id = ?3")
-    .bind(hash, now(), user.id).run();
+  await env.DB.prepare("UPDATE users SET password_hash = ?1, password_plain = ?2, must_change_pwd = 0, updated_at = ?3 WHERE id = ?4")
+    .bind(hash, String(new_password), now(), user.id).run();
   return json({ ok: true });
 }
 
@@ -674,7 +674,16 @@ async function adminRoute(path, method, request, env, user) {
     const rows = await env.DB.prepare(
       `SELECT u.*, o.name AS office_name FROM users u LEFT JOIN offices o ON o.id = u.scope_id ORDER BY u.created_at`
     ).all();
-    return json({ ok: true, users: rows.results.map(sanitizeUser) });
+    return json({
+      ok: true,
+      users: rows.results.map(u => ({
+        id: u.id, username: u.username, display_name: u.display_name,
+        role: u.role, scope_type: u.scope_type, scope_id: u.scope_id,
+        office_name: u.office_name, enabled: !!u.enabled,
+        must_change_pwd: !!u.must_change_pwd,
+        password_plain: u.password_plain || null,
+      }))
+    });
   }
   if (path === "admin/users" && method === "POST") return await createUser(request, env);
   if (path.startsWith("admin/users/") && method === "PUT") return await updateUser(path, request, env);
@@ -691,7 +700,13 @@ async function adminRoute(path, method, request, env, user) {
 
   // 养护所管理
   if (path === "admin/offices") {
-    if (method === "GET") { const r = await env.DB.prepare("SELECT * FROM offices ORDER BY sort_order, name").all(); return json({ ok: true, offices: r.results }); }
+    if (method === "GET") {
+      const r = await env.DB.prepare(
+        `SELECT o.*, (SELECT COUNT(*) FROM points p WHERE p.office_id = o.id) AS point_count
+         FROM offices o ORDER BY o.sort_order, o.name`
+      ).all();
+      return json({ ok: true, offices: r.results });
+    }
     if (method === "POST") return await upsertOffice(request, env, null);
   }
   if (path.startsWith("admin/offices/") && method === "PUT") return await upsertOffice(request, env, path.replace("admin/offices/", ""));
@@ -783,9 +798,9 @@ async function createUser(request, env) {
   const hash = await makePassword(String(password));
   const id = crypto.randomUUID();
   await env.DB.prepare(
-    `INSERT INTO users (id, username, password_hash, display_name, role, scope_type, scope_id, must_change_pwd, enabled, created_at, updated_at)
-     VALUES (?1,?2,?3,?4,?5,?6,?7,1,1,?8,?8)`
-  ).bind(id, username, hash, display_name, role, scope_type || "all", scope_id || null, now()).run();
+    `INSERT INTO users (id, username, password_hash, password_plain, display_name, role, scope_type, scope_id, must_change_pwd, enabled, created_at, updated_at)
+     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,1,1,?9,?9)`
+  ).bind(id, username, hash, String(password), display_name, role, scope_type || "all", scope_id || null, now()).run();
   return json({ ok: true, id });
 }
 
@@ -830,8 +845,8 @@ async function resetPassword(path, request, env) {
   const { password } = await request.json().catch(() => ({}));
   if (!password || String(password).length < 6) return fail("密码至少 6 位", 400);
   const hash = await makePassword(String(password));
-  await env.DB.prepare("UPDATE users SET password_hash=?1, must_change_pwd=1, updated_at=?2 WHERE id=?3")
-    .bind(hash, now(), id).run();
+  await env.DB.prepare("UPDATE users SET password_hash=?1, password_plain=?2, must_change_pwd=1, updated_at=?3 WHERE id=?4")
+    .bind(hash, String(password), now(), id).run();
   return json({ ok: true });
 }
 

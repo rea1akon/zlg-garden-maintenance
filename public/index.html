@@ -56,6 +56,11 @@ a { color: var(--green3); }
 .btn-block { width: 100%; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
+/* 账号密码明文显示 */
+.pwd-cell { display: inline-flex; align-items: center; gap: 6px; }
+.pwd-dots { font-family: monospace; letter-spacing: 1px; }
+.pwd-toggle { padding: 2px 8px; border: none; background: transparent; cursor: pointer; font-size: 14px; }
+
 /* 输入 */
 .input, select, textarea {
   width: 100%; padding: 11px 14px; border-radius: var(--radius-sm);
@@ -137,6 +142,10 @@ label { font-size: 13px; color: var(--text2); display: block; margin-bottom: 6px
 .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .table-wrap table { min-width: 560px; }
+
+/* 筛选栏 */
+.filter-bar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.filter-bar .input { width: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); }
 th { background: var(--bg2); color: var(--text2); font-weight: 500; white-space: nowrap; }
@@ -805,11 +814,12 @@ function renderAdmin() {
           <div style="font-size:18px;font-weight:600">账号配置</div>
           <button class="btn btn-primary" id="add-user-btn">+ 新增账号</button>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>账号</th><th>姓名</th><th>角色</th><th>范围</th><th>状态</th><th>操作</th></tr></thead>
+        <div class="table-wrap"><table><thead><tr><th>账号</th><th>姓名</th><th>角色</th><th>范围</th><th>密码</th><th>状态</th><th>操作</th></tr></thead>
         <tbody>${data.users.map(u=>`
           <tr>
             <td>${esc(u.username)}</td><td>${esc(u.display_name)}</td>
             <td>${ROLE_TEXT[u.role]}</td><td>${u.scope_type==='all'?'全部':(u.office_name||u.scope_id||'—')}</td>
+            <td><span class="pwd-cell" data-pwd="${esc(u.password_plain||'')}"><span class="pwd-dots">••••••</span><button class="btn btn-sm btn-ghost pwd-toggle" title="显示/隐藏密码">👁</button></span></td>
             <td>${u.enabled?'启用':'禁用'}</td>
             <td><button class="btn btn-sm" data-edit-user="${u.id}">编辑</button> <button class="btn btn-sm" data-reset-user="${u.id}">重置密码</button> <button class="btn btn-sm btn-danger" data-del-user="${u.id}">删除</button></td>
           </tr>`).join("")}</tbody></table></div>`;
@@ -817,6 +827,13 @@ function renderAdmin() {
         $$("[data-edit-user]").forEach(b => b.onclick = () => ad.userForm(data.users.find(u=>u.id===b.dataset.editUser)));
         $$("[data-reset-user]").forEach(b => b.onclick = () => ad.resetPwd(b.dataset.resetUser));
         $$("[data-del-user]").forEach(b => b.onclick = () => ad.delUser(b.dataset.delUser));
+        $$(".pwd-toggle").forEach(b => b.onclick = () => {
+          const cell = b.closest(".pwd-cell");
+          const dots = cell.querySelector(".pwd-dots");
+          const pwd = cell.dataset.pwd || "";
+          if (dots.textContent === "••••••") { dots.textContent = pwd; b.textContent = "🙈"; }
+          else { dots.textContent = "••••••"; b.textContent = "👁"; }
+        });
       } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px">${esc(e.message)}</div>`; }
     },
     async userForm(user) {
@@ -889,30 +906,28 @@ function renderAdmin() {
       $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
       try {
         const [regions, offices] = await Promise.all([api.get("admin/regions"), api.get("admin/offices")]);
+        const officeCount = rid => offices.offices.filter(o => o.region_id === rid).length;
+        const regionName = rid => (regions.regions.find(r => r.id === rid)?.name || "—");
         $(".main").innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <div style="font-size:18px;font-weight:600">区域 / 养护所管理</div>
           <div style="display:flex;gap:8px"><button class="btn" id="add-region-btn">+ 区域</button><button class="btn btn-primary" id="add-office-btn">+ 养护所</button></div>
         </div>
-        ${regions.regions.map(rg=>`
-          <div class="card" style="margin-bottom:14px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-              <span style="font-weight:600;font-size:16px">${esc(rg.name)}</span>
-              <div style="display:flex;gap:6px"><button class="btn btn-sm" data-edit-region="${rg.id}" data-name="${esc(rg.name)}" data-code="${esc(rg.code||"")}">编辑</button><button class="btn btn-sm btn-danger" data-del-region="${rg.id}">删除</button></div>
-            </div>
-            <div class="photo-grid" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))">
-              ${offices.offices.filter(o=>o.region_id===rg.id).map(o=>`
-                <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center">
-                  <span>${esc(o.name)}</span>
-                  <div style="display:flex;gap:4px"><button class="btn btn-sm" data-edit-office="${o.id}" data-name="${esc(o.name)}" data-region="${o.region_id}">改</button><button class="btn btn-sm btn-danger" data-del-office="${o.id}">删</button></div>
-                </div>`).join("")}
-            </div>
-          </div>`).join("")}`;
+        <div style="font-weight:600;font-size:15px;margin-bottom:10px">区域</div>
+        <div class="table-wrap" style="margin-bottom:24px"><table><thead><tr><th>名称</th><th>编码</th><th>养护所数</th><th>操作</th></tr></thead>
+        <tbody>${regions.regions.map(rg=>`
+          <tr><td>${esc(rg.name)}</td><td>${esc(rg.code||"—")}</td><td>${officeCount(rg.id)}</td>
+          <td><button class="btn btn-sm" data-edit-region="${rg.id}" data-name="${esc(rg.name)}" data-code="${esc(rg.code||"")}">编辑</button> <button class="btn btn-sm btn-danger" data-del-region="${rg.id}">删除</button></td></tr>`).join("")}</tbody></table></div>
+        <div style="font-weight:600;font-size:15px;margin-bottom:10px">养护所</div>
+        <div class="table-wrap"><table><thead><tr><th>名称</th><th>所属区域</th><th>养护点数</th><th>操作</th></tr></thead>
+        <tbody>${offices.offices.map(o=>`
+          <tr><td>${esc(o.name)}</td><td>${esc(regionName(o.region_id))}</td><td>${o.point_count!=null?o.point_count:"—"}</td>
+          <td><button class="btn btn-sm" data-edit-office="${o.id}" data-name="${esc(o.name)}" data-region="${o.region_id}">编辑</button> <button class="btn btn-sm btn-danger" data-del-office="${o.id}">删除</button></td></tr>`).join("")}</tbody></table></div>`;
         $("#add-region-btn").onclick = () => ad.regionForm(null, offices.offices);
         $("#add-office-btn").onclick = () => ad.officeForm(null, regions.regions);
         $$("[data-edit-region]").forEach(b => b.onclick = () => ad.regionForm({id:b.dataset.editRegion,name:b.dataset.name,code:b.dataset.code}, offices.offices));
         $$("[data-del-region]").forEach(b => b.onclick = async () => { if(!confirm("删除区域会连带删除其下养护所，确定？"))return; try{await api.del("admin/regions/"+b.dataset.delRegion);toast("已删除");ad.loadRegion();}catch(e){toast(e.message);} });
-        $$("[data-edit-office]").forEach(b => b.onclick = () => ad.officeForm({id:b.dataset.editOffice,name:b.dataset.name,region_id:b.dataset.region}, regions.regions));
+        $$("[data-edit-office]").forEach(b => b.onclick = () => ad.officeForm({id:b.dataset.editOffice,name:b.dataset.name,region_id:b.dataset.region,code:b.dataset.code}, regions.regions));
         $$("[data-del-office]").forEach(b => b.onclick = async () => { if(!confirm("确定删除？"))return; try{await api.del("admin/offices/"+b.dataset.delOffice);toast("已删除");ad.loadRegion();}catch(e){toast(e.message);} });
       } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px">${esc(e.message)}</div>`; }
     },
@@ -953,15 +968,36 @@ function renderAdmin() {
       $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
       try {
         const [points, offices] = await Promise.all([api.get("admin/points"), api.get("offices")]);
+        ad._pointsAll = points.points; ad._offices = offices.offices;
         $(".main").innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <div style="font-size:18px;font-weight:600">养护点管理</div>
           <button class="btn btn-primary" id="add-point-btn">+ 新增养护点</button>
         </div>
+        <div class="filter-bar">
+          <select class="input" id="pt-filter-office" style="max-width:200px">
+            <option value="">全部养护所</option>
+            ${offices.offices.map(o=>`<option value="${o.id}">${esc(o.name)}</option>`).join("")}
+          </select>
+          <input class="input" id="pt-search" placeholder="搜索养护点名称…" style="max-width:240px">
+        </div>
         <div class="table-wrap"><table><thead><tr><th>名称</th><th>所属养护所</th><th>产权单位</th><th>区块类型</th><th>面积(㎡)</th><th>操作</th></tr></thead>
-        <tbody>${points.points.map(p=>{const o=offices.offices.find(x=>x.id===p.office_id);return `
-          <tr><td>${esc(p.name)}</td><td>${esc(o?.name||p.office_id)}</td><td>${esc(p.owner||"—")}</td><td>${esc(p.category||"—")}</td><td>${p.area!=null?p.area:"—"}</td>
-          <td><button class="btn btn-sm" data-edit-point="${p.id}">编辑</button> <button class="btn btn-sm btn-danger" data-del-point="${p.id}">删除</button></td></tr>`;}).join("")}</tbody></table></div>`;
+        <tbody id="pt-tbody"></tbody></table></div>`;
+        const renderTbody = () => {
+          const officeId = $("#pt-filter-office").value;
+          const kw = ($("#pt-search").value || "").trim().toLowerCase();
+          const list = ad._pointsAll.filter(p => {
+            if (officeId && p.office_id !== officeId) return false;
+            if (kw && !(p.name || "").toLowerCase().includes(kw)) return false;
+            return true;
+          });
+          $("#pt-tbody").innerHTML = list.map(p=>{const o=offices.offices.find(x=>x.id===p.office_id);return `
+            <tr><td>${esc(p.name)}</td><td>${esc(o?.name||p.office_id)}</td><td>${esc(p.owner||"—")}</td><td>${esc(p.category||"—")}</td><td>${p.area!=null?p.area:"—"}</td>
+            <td><button class="btn btn-sm" data-edit-point="${p.id}">编辑</button> <button class="btn btn-sm btn-danger" data-del-point="${p.id}">删除</button></td></tr>`;}).join("") || `<tr><td colspan="6" style="text-align:center;color:var(--text3)">无匹配结果</td></tr>`;
+        };
+        renderTbody();
+        $("#pt-filter-office").onchange = renderTbody;
+        $("#pt-search").oninput = renderTbody;
         $("#add-point-btn").onclick = () => ad.pointForm(null, offices.offices);
         $$("[data-edit-point]").forEach(b => b.onclick = () => ad.pointForm(points.points.find(p=>p.id===b.dataset.editPoint), offices.offices));
         $$("[data-del-point]").forEach(b => b.onclick = async () => { if(!confirm("确定删除？"))return; try{await api.del("admin/points/"+b.dataset.delPoint);toast("已删除");ad.loadPoints();}catch(e){toast(e.message);} });
@@ -1002,13 +1038,10 @@ function renderAdmin() {
           <button class="btn btn-primary" id="add-ct-btn">+ 新增内容</button>
         </div>
         <div style="color:var(--text3);font-size:12px;margin-bottom:12px">仅管理员可增删改养护内容，各养护所从这里预设自己负责的内容</div>
-        <div class="photo-grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
-          ${data.careTypes.map(c=>`
-            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center">
-              <span>${esc(c.name)} <span style="color:var(--text3);font-size:12px">${esc(c.unit)}</span></span>
-              <div style="display:flex;gap:4px"><button class="btn btn-sm" data-edit-ct="${c.id}" data-name="${esc(c.name)}" data-unit="${esc(c.unit)}">改</button><button class="btn btn-sm btn-danger" data-del-ct="${c.id}">删</button></div>
-            </div>`).join("")}
-        </div>`;
+        <div class="table-wrap"><table><thead><tr><th>名称</th><th>单位</th><th>操作</th></tr></thead>
+        <tbody>${data.careTypes.map(c=>`
+          <tr><td>${esc(c.name)}</td><td>${esc(c.unit||"—")}</td>
+          <td><button class="btn btn-sm" data-edit-ct="${c.id}" data-name="${esc(c.name)}" data-unit="${esc(c.unit)}">编辑</button> <button class="btn btn-sm btn-danger" data-del-ct="${c.id}">删除</button></td></tr>`).join("")}</tbody></table></div>`;
         $("#add-ct-btn").onclick = () => ad.careTypeForm(null);
         $$("[data-edit-ct]").forEach(b => b.onclick = () => ad.careTypeForm({id:b.dataset.editCt,name:b.dataset.name,unit:b.dataset.unit}));
         $$("[data-del-ct]").forEach(b => b.onclick = async () => { if(!confirm("确定删除该养护内容？"))return; try{await api.del("admin/care-types/"+b.dataset.delCt);toast("已删除");ad.loadCareTypes();}catch(e){toast(e.message);} });
