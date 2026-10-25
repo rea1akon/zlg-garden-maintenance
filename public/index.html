@@ -958,9 +958,9 @@ function renderAdmin() {
           <div style="font-size:18px;font-weight:600">养护点管理</div>
           <button class="btn btn-primary" id="add-point-btn">+ 新增养护点</button>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>名称</th><th>所属养护所</th><th>分类</th><th>位置</th><th>操作</th></tr></thead>
+        <div class="table-wrap"><table><thead><tr><th>名称</th><th>所属养护所</th><th>产权单位</th><th>区块类型</th><th>面积(㎡)</th><th>操作</th></tr></thead>
         <tbody>${points.points.map(p=>{const o=offices.offices.find(x=>x.id===p.office_id);return `
-          <tr><td>${esc(p.name)}</td><td>${esc(o?.name||p.office_id)}</td><td>${esc(p.category||"—")}</td><td>${esc(p.location||"—")}</td>
+          <tr><td>${esc(p.name)}</td><td>${esc(o?.name||p.office_id)}</td><td>${esc(p.owner||"—")}</td><td>${esc(p.category||"—")}</td><td>${p.area!=null?p.area:"—"}</td>
           <td><button class="btn btn-sm" data-edit-point="${p.id}">编辑</button> <button class="btn btn-sm btn-danger" data-del-point="${p.id}">删除</button></td></tr>`;}).join("")}</tbody></table></div>`;
         $("#add-point-btn").onclick = () => ad.pointForm(null, offices.offices);
         $$("[data-edit-point]").forEach(b => b.onclick = () => ad.pointForm(points.points.find(p=>p.id===b.dataset.editPoint), offices.offices));
@@ -969,19 +969,26 @@ function renderAdmin() {
     },
     pointForm(point, offices) {
       const isEdit = !!point;
+      const btype = point?.category || "道路绿地";
+      const bstatus = point?.status || "正常养护";
+      const typeOptions = ["道路绿地","小区绿地","公园绿地","防护绿地"].map(t=>`<option value="${t}" ${btype===t?'selected':''}>${t}</option>`).join("");
+      const statusOptions = ["正常养护","暂停养护","已移交","其他"].map(s=>`<option value="${s}" ${bstatus===s?'selected':''}>${s}</option>`).join("");
       $("#app").insertAdjacentHTML("beforeend", `
       <div class="modal-mask" id="pt-mask"><div class="modal">
         <div class="modal-title">${isEdit?"编辑养护点":"新增养护点"}</div>
-        <div class="form-group"><label>所属养护所</label><select class="input" id="pt-office">${offices.map(o=>`<option value="${o.id}" ${point?.office_id===o.id?'selected':''}>${esc(o.name)}</option>`).join("")}</select></div>
-        <div class="form-group"><label>名称</label><input class="input" id="pt-name" value="${esc(point?.name||"")}"></div>
-        <div class="form-group"><label>分类</label><input class="input" id="pt-category" value="${esc(point?.category||"")}" placeholder="绿化带/行道树/草坪…"></div>
-        <div class="form-group"><label>位置描述</label><input class="input" id="pt-location" value="${esc(point?.location||"")}"></div>
+        <div class="form-group"><label>名称</label><input class="input" id="pt-name" value="${esc(point?.name||"")}" placeholder="养护区块名称"></div>
+        <div class="form-group"><label>所属养护所（责任单位）</label><select class="input" id="pt-office">${offices.map(o=>`<option value="${o.id}" ${point?.office_id===o.id?'selected':''}>${esc(o.name)}</option>`).join("")}</select></div>
+        <div class="form-group"><label>产权单位</label><input class="input" id="pt-owner" value="${esc(point?.owner||"")}" placeholder="庄市街道办/综合行政执法局…"></div>
+        <div class="form-group"><label>区块状态</label><select class="input" id="pt-status">${statusOptions}</select></div>
+        <div class="form-group"><label>区块类型</label><select class="input" id="pt-category">${typeOptions}</select></div>
+        <div class="form-group"><label>面积（平方米）</label><input class="input" id="pt-area" type="number" step="0.01" value="${point?.area!=null?point.area:""}" placeholder="如 11319.85"></div>
         <div style="display:flex;gap:10px"><button class="btn btn-primary" style="flex:1" id="pt-save">保存</button><button class="btn" style="flex:1" id="pt-cancel">取消</button></div>
       </div></div>`);
       $("#pt-cancel").onclick = () => $("#pt-mask").remove();
       $("#pt-save").onclick = async () => {
         const name = $("#pt-name").value.trim(); if(!name) return toast("请填写名称");
-        const body = { office_id:$("#pt-office").value, name, category:$("#pt-category").value, location:$("#pt-location").value };
+        const area = $("#pt-area").value;
+        const body = { office_id:$("#pt-office").value, name, owner:$("#pt-owner").value.trim(), status:$("#pt-status").value, category:$("#pt-category").value, area: area?parseFloat(area):null };
         try { if(isEdit) await api.put("admin/points/"+point.id, body); else await api.post("admin/points", body); $("#pt-mask").remove();toast("已保存");ad.loadPoints(); } catch(e){toast(e.message);}
       };
     },

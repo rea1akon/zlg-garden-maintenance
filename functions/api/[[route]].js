@@ -864,16 +864,16 @@ async function upsertOffice(request, env, id) {
 }
 
 async function upsertPoint(request, env, id) {
-  const { office_id, name, category, location, sort_order } = await request.json().catch(() => ({}));
+  const { office_id, name, owner, status, category, area, location, sort_order } = await request.json().catch(() => ({}));
   if (!office_id || !name) return fail("缺少养护所或名称", 400);
   if (id) {
-    await env.DB.prepare("UPDATE points SET office_id=?1, name=?2, category=?3, location=?4, sort_order=?5 WHERE id=?6")
-      .bind(office_id, name, category || null, location || null, sort_order || 0, id).run();
+    await env.DB.prepare("UPDATE points SET office_id=?1, name=?2, owner=?3, status=?4, category=?5, area=?6, location=?7, sort_order=?8 WHERE id=?9")
+      .bind(office_id, name, owner || null, status || null, category || null, area != null ? area : null, location || null, sort_order || 0, id).run();
     return json({ ok: true, id });
   }
   const nid = crypto.randomUUID();
-  await env.DB.prepare("INSERT INTO points (id, office_id, name, category, location, sort_order, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7)")
-    .bind(nid, office_id, name, category || null, location || null, sort_order || 0, now()).run();
+  await env.DB.prepare("INSERT INTO points (id, office_id, name, owner, status, category, area, location, sort_order, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)")
+    .bind(nid, office_id, name, owner || null, status || null, category || null, area != null ? area : null, location || null, sort_order || 0, now()).run();
   return json({ ok: true, id: nid });
 }
 
