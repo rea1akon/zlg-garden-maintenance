@@ -237,6 +237,11 @@ export async function onRequest(context) {
     if (path === "change-password" && method === "POST") return await changePassword(request, env, user);
     if (path === "ping") return json({ ok: true, photoStore: photoStore(env), bound: { db: true, bucket: !!env.BUCKET, secret: !!env.AUTH_SECRET } });
 
+    // 照片上传（multipart，必须放在 photos/ 读取之前，否则会被误当读取）
+    if (path === "photos/upload" && method === "POST") {
+      return await uploadPhoto(request, env, user);
+    }
+
     // 照片读取（登录用户，双向授权）
     if (path.startsWith("photos/")) return await servePhoto(path, env, user);
 
@@ -507,11 +512,6 @@ async function unitRoute(path, method, request, env, user) {
   if (path.startsWith("records/") && method === "DELETE") {
     const id = path.replace("records/", "");
     return await deleteRecord(env, user, id);
-  }
-
-  // 照片上传
-  if (path === "photos/upload" && method === "POST") {
-    return await uploadPhoto(request, env, user);
   }
 
   return fail("Not found", 404);
