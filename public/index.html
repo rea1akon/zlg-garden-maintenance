@@ -70,10 +70,21 @@ label { font-size: 13px; color: var(--text2); display: block; margin-bottom: 6px
 .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
 
 /* 登录页 */
-.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.login-wrap {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: url("login-bg.jpg") center center / cover no-repeat;
+  position: relative;
+}
+.login-wrap::before {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(6, 18, 10, 0.72) 0%, rgba(6, 18, 10, 0.78) 100%);
+  z-index: 0;
+}
+.login-wrap > * { position: relative; z-index: 1; }
 .login-card {
-  width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--border2);
+  width: 100%; max-width: 400px; background: rgba(15, 26, 18, 0.82); border: 1px solid var(--border2);
   border-radius: 20px; padding: 36px 30px; position: relative; overflow: hidden;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
 }
 .login-card::before {
   content: ""; position: absolute; top: -60px; left: -60px; width: 160px; height: 160px;
@@ -85,7 +96,7 @@ label { font-size: 13px; color: var(--text2); display: block; margin-bottom: 6px
   display: flex; align-items: center; justify-content: center;
   font-size: 28px; color: #fff; box-shadow: 0 0 30px var(--green-glow);
 }
-.app-title { text-align: center; font-size: 19px; font-weight: 600; }
+.app-title { text-align: center; font-size: 19px; font-weight: 600; margin-bottom: 24px; }
 .app-sub { text-align: center; font-size: 13px; color: var(--text2); margin: 6px 0 24px; }
 
 /* 布局 */
@@ -124,6 +135,8 @@ label { font-size: 13px; color: var(--text2); display: block; margin-bottom: 6px
 
 /* 表格 */
 .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-wrap table { min-width: 560px; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); }
 th { background: var(--bg2); color: var(--text2); font-weight: 500; white-space: nowrap; }
@@ -328,9 +341,7 @@ function renderLogin() {
   $("#app").innerHTML = `
   <div class="login-wrap">
     <div class="login-card">
-      <div class="logo">园</div>
       <div class="app-title">庄骆贵园林养护成效管理系统</div>
-      <div class="app-sub">数字化养护 · 云端协同</div>
       <div class="form-group"><label>账号</label><input class="input" id="login-username" placeholder="请输入账号"></div>
       <div class="form-group"><label>密码</label><input class="input" id="login-password" type="password" placeholder="请输入密码"></div>
       <button class="btn btn-primary btn-block" id="login-btn">登 录</button>
