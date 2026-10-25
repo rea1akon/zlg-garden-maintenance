@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>庄骆贵园林养护成效管理系统</title>
+<style>
+:root {
+  --bg: #0a120c;
+  --bg2: #0f1a12;
+  --card: #132118;
+  --card2: #182a1d;
+  --border: #243a2b;
+  --border2: #31523a;
+  --green: #22c55e;
+  --green2: #16a34a;
+  --green3: #4ade80;
+  --green-glow: rgba(34, 197, 94, 0.15);
+  --text: #e8f0ea;
+  --text2: #9ab3a0;
+  --text3: #5f7a68;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --blue: #3b82f6;
+  --radius: 14px;
+  --radius-sm: 10px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+#particles { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.app { position: relative; z-index: 1; min-height: 100vh; }
+.hidden { display: none !important; }
+a { color: var(--green3); }
+
+/* 按钮 */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border2);
+  background: var(--card2); color: var(--text); font-size: 14px; cursor: pointer;
+  transition: all .15s; user-select: none; white-space: nowrap;
+}
+.btn:hover { border-color: var(--green); }
+.btn-primary { background: linear-gradient(135deg, #22c55e, #16a34a); border: none; color: #06220f; font-weight: 600; }
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-danger { background: #7f1d1d; border: 1px solid #b91c1c; color: #fecaca; }
+.btn-ghost { background: transparent; }
+.btn-sm { padding: 6px 12px; font-size: 13px; }
+.btn-block { width: 100%; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* 输入 */
+.input, select, textarea {
+  width: 100%; padding: 11px 14px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border2); background: var(--bg2); color: var(--text);
+  font-size: 14px; outline: none; transition: border .15s;
+}
+.input:focus, select:focus, textarea:focus { border-color: var(--green); }
+textarea { resize: vertical; min-height: 72px; }
+label { font-size: 13px; color: var(--text2); display: block; margin-bottom: 6px; }
+
+/* 卡片 */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+
+/* 登录页 */
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.login-card {
+  width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--border2);
+  border-radius: 20px; padding: 36px 30px; position: relative; overflow: hidden;
+}
+.login-card::before {
+  content: ""; position: absolute; top: -60px; left: -60px; width: 160px; height: 160px;
+  background: radial-gradient(circle, var(--green-glow), transparent 70%); border-radius: 50%;
+}
+.logo {
+  width: 60px; height: 60px; border-radius: 18px; margin: 0 auto 16px;
+  background: linear-gradient(135deg, #22c55e, #15803d);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; color: #fff; box-shadow: 0 0 30px var(--green-glow);
+}
+.app-title { text-align: center; font-size: 19px; font-weight: 600; }
+.app-sub { text-align: center; font-size: 13px; color: var(--text2); margin: 6px 0 24px; }
+
+/* 布局 */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; background: rgba(15, 26, 18, 0.9); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;
+}
+.topbar .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; }
+.topbar .brand .logo-sm {
+  width: 32px; height: 32px; border-radius: 10px; background: linear-gradient(135deg, #22c55e, #15803d);
+  display: flex; align-items: center; justify-content: center; color: #fff; font-size: 16px;
+}
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+/* 侧边栏（桌面） */
+.layout { display: flex; min-height: calc(100vh - 61px); }
+.sidebar {
+  width: 200px; flex-shrink: 0; background: var(--bg2); border-right: 1px solid var(--border);
+  padding: 16px 12px;
+}
+.sidebar .nav-item {
+  display: block; width: 100%; text-align: left; padding: 11px 14px; margin-bottom: 4px;
+  border-radius: var(--radius-sm); border: none; background: transparent; color: var(--text2);
+  font-size: 14px; cursor: pointer; transition: all .15s;
+}
+.sidebar .nav-item:hover { background: var(--card); color: var(--text); }
+.sidebar .nav-item.active { background: var(--card2); color: var(--green3); font-weight: 600; }
+.main { flex: 1; padding: 24px; min-width: 0; }
+
+/* 指标卡 */
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.metric { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+.metric .label { font-size: 12px; color: var(--text2); }
+.metric .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+
+/* 表格 */
+.table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+th { background: var(--bg2); color: var(--text2); font-weight: 500; white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(34, 197, 94, 0.03); }
+
+/* 状态徽标 */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 12px; border: 1px solid; }
+.badge-pending { color: var(--amber); border-color: var(--amber); background: rgba(245, 158, 11, 0.1); }
+.badge-approved { color: var(--green3); border-color: var(--green); background: rgba(34, 197, 94, 0.1); }
+.badge-rejected { color: var(--red); border-color: var(--red); background: rgba(239, 68, 68, 0.1); }
+
+/* 照片网格 */
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.photo-box {
+  aspect-ratio: 4/3; background: var(--bg2); border: 1px dashed var(--border2); border-radius: var(--radius-sm);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  cursor: pointer; position: relative; overflow: hidden; color: var(--text3); font-size: 12px;
+}
+.photo-box img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.photo-box .del { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; border: none; cursor: pointer; font-size: 14px; z-index: 2; }
+
+/* 搜索下拉 */
+.search-dropdown { position: relative; }
+.dropdown-panel {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; max-height: 260px; overflow-y: auto;
+  background: var(--card2); border: 1px solid var(--border2); border-radius: var(--radius-sm); z-index: 50;
+}
+.dropdown-item { padding: 10px 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+.dropdown-item:hover { background: var(--card); }
+.dropdown-item .unit { color: var(--text3); font-size: 12px; }
+
+/* 公示大屏 */
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.dash-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.dash-card .dash-img { aspect-ratio: 16/10; background: var(--bg2); display: flex; align-items: center; justify-content: center; color: var(--text3); overflow: hidden; }
+.dash-card .dash-img img { width: 100%; height: 100%; object-fit: cover; }
+.dash-card .dash-body { padding: 14px; }
+.dash-card .dash-title { font-weight: 600; font-size: 15px; }
+.dash-card .dash-stats { display: flex; gap: 12px; margin-top: 8px; font-size: 12px; color: var(--text2); }
+.dash-card .dash-time { font-size: 11px; color: var(--text3); margin-top: 6px; }
+
+/* 表单组 */
+.form-group { margin-bottom: 16px; }
+.row { display: flex; gap: 14px; }
+.row > * { flex: 1; }
+
+/* 模态框 */
+.modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal { background: var(--card); border: 1px solid var(--border2); border-radius: 16px; padding: 24px; width: 100%; max-width: 520px; max-height: 85vh; overflow-y: auto; }
+.modal-title { font-size: 17px; font-weight: 600; margin-bottom: 16px; }
+
+/* toast */
+.toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--card2); border: 1px solid var(--border2); padding: 12px 20px; border-radius: 10px; z-index: 200; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+
+/* 移动端 */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .container { padding: 14px; }
+  .main { padding: 16px; }
+  .row { flex-direction: column; gap: 0; }
+  .photo-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.tabbar { display: none; }
+@media (max-width: 768px) {
+  .tabbar {
+    display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+    background: var(--bg2); border-top: 1px solid var(--border);
+  }
+  .tabbar .tab {
+    flex: 1; text-align: center; padding: 12px 4px; font-size: 12px; color: var(--text2);
+    border: none; background: transparent; cursor: pointer;
+  }
+  .tabbar .tab.active { color: var(--green3); }
+  body { padding-bottom: 56px; }
+}
+.time-tag { font-size: 11px; color: var(--text3); }
+</style>
+</head>
+<body>
+<canvas id="particles"></canvas>
+<div class="app" id="app"></div>
+<div id="toast" class="toast hidden"></div>
+<script>
+// ============ 状态与工具 ============
+const TOKEN_KEY = "zlg_token";
+const VISITOR_KEY = "zlg_visitor";
+let state = {
+  token: localStorage.getItem(TOKEN_KEY) || "",
+  user: null,
+  visitor: localStorage.getItem(VISITOR_KEY) || "",
+  view: "login",
+};
+
+function $(sel, el = document) { return el.querySelector(sel); }
+function $$(sel, el = document) { return [...el.querySelectorAll(sel)]; }
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+function toast(msg, ms = 2200) {
+  const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden");
+  clearTimeout(t._timer); t._timer = setTimeout(() => t.classList.add("hidden"), ms);
+}
+function fmtTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function today() {
+  const d = new Date(); const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+const STATUS_TEXT = { pending: "待审核", approved: "已通过", rejected: "已驳回" };
+const STATUS_BADGE = { pending: "badge-pending", approved: "badge-approved", rejected: "badge-rejected" };
+const ROLE_TEXT = { admin: "管理员", reviewer: "考核员", unit: "养护单位" };
+
+// ============ API 封装 ============
+const api = {
+  async request(path, opts = {}) {
+    const headers = { ...(opts.headers || {}) };
+    if (opts.body && !(opts.body instanceof FormData)) headers["Content-Type"] = "application/json";
+    const token = state.view === "visitor" ? state.visitor : state.token;
+    if (token) headers["Authorization"] = "Bearer " + token;
+    const res = await fetch("/api/" + path, { method: opts.method || "GET", headers, body: opts.body });
+    let data = null;
+    try { data = await res.json(); } catch (e) {}
+    if (res.status === 401 && data && data.code === "UNAUTHORIZED") {
+      if (state.view === "visitor") { state.visitor = ""; localStorage.removeItem(VISITOR_KEY); }
+      else { state.token = ""; localStorage.removeItem(TOKEN_KEY); state.user = null; }
+      state.view = "login"; render();
+      throw new Error(data.error || "登录已过期");
+    }
+    if (!res.ok || (data && data.ok === false)) throw new Error(data?.error || "请求失败");
+    return data;
+  },
+  get(p) { return this.request(p); },
+  post(p, body) { return this.request(p, { method: "POST", body: body instanceof FormData ? body : JSON.stringify(body || {}) }); },
+  put(p, body) { return this.request(p, { method: "PUT", body: JSON.stringify(body || {}) }); },
+  del(p) { return this.request(p, { method: "DELETE" }); },
+};
+
+// 照片 blob 加载（带缓存）
+const photoCache = {
+  map: new Map(),
+  async get(key) {
+    if (this.map.has(key)) return this.map.get(key);
+    const url = state.view === "visitor" ? "/api/public/photo/" : "/api/photos/";
+    const res = await fetch(url + encodeURIComponent(key), {
+      headers: { Authorization: "Bearer " + (state.view === "visitor" ? state.visitor : state.token) },
+    });
+    if (!res.ok) throw new Error("load-fail");
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    this.map.set(key, objUrl);
+    return objUrl;
+  },
+  release(keys) {
+    (keys || []).forEach(k => { const u = this.map.get(k); if (u) { URL.revokeObjectURL(u); this.map.delete(k); } });
+  },
+  clear() {
+    this.map.forEach(u => URL.revokeObjectURL(u)); this.map.clear();
+  },
+};
+
+// ============ 粒子背景 ============
+function initParticles() {
+  const canvas = $("#particles"); const ctx = canvas.getContext("2d");
+  let W, H, pts = [];
+  function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+  resize(); addEventListener("resize", resize);
+  for (let i = 0; i < 60; i++) {
+    pts.push({ x: Math.random()*W, y: Math.random()*H, vx: (Math.random()-.5)*.4, vy: (Math.random()-.5)*.4, r: Math.random()*1.6+.4 });
+  }
+  (function loop() {
+    ctx.clearRect(0, 0, W, H);
+    for (const p of pts) {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0 || p.x > W) p.vx *= -1;
+      if (p.y < 0 || p.y > H) p.vy *= -1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(74, 222, 128, 0.28)"; ctx.fill();
+    }
+    requestAnimationFrame(loop);
+  })();
+}
+
+// ============ 路由渲染 ============
+function render() {
+  const app = $("#app");
+  if (state.view === "visitor") return renderVisitor();
+  if (!state.token) return renderLogin();
+  if (state.user?.must_change_pwd) return renderChangePwd();
+  if (state.user?.role === "admin") return renderAdmin();
+  if (state.user?.role === "reviewer") return renderReviewer();
+  if (state.user?.role === "unit") return renderUnit();
+  renderLogin();
+}
+
+// ============ 登录 ============
+function renderLogin() {
+  $("#app").innerHTML = `
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="logo">园</div>
+      <div class="app-title">庄骆贵园林养护成效管理系统</div>
+      <div class="app-sub">数字化养护 · 云端协同</div>
+      <div class="form-group"><label>账号</label><input class="input" id="login-username" placeholder="请输入账号"></div>
+      <div class="form-group"><label>密码</label><input class="input" id="login-password" type="password" placeholder="请输入密码"></div>
+      <button class="btn btn-primary btn-block" id="login-btn">登 录</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:10px" id="visitor-btn">游客访问 · 查看养护成效公示</button>
+    </div>
+  </div>`;
+  $("#login-btn").onclick = doLogin;
+  $("#visitor-btn").onclick = showVisitorModal;
+  $("#login-password").onkeydown = e => { if (e.key === "Enter") doLogin(); };
+}
+
+async function doLogin() {
+  const username = $("#login-username").value.trim();
+  const password = $("#login-password").value;
+  if (!username || !password) return toast("请输入账号和密码");
+  try {
+    const data = await api.post("login", { username, password });
+    state.token = data.token; state.user = data.user;
+    localStorage.setItem(TOKEN_KEY, data.token);
+    toast("登录成功");
+    if (data.user.must_change_pwd) state.view = "change-pwd";
+    else state.view = data.user.role === "admin" ? "admin" : data.user.role === "reviewer" ? "reviewer" : "unit";
+    render();
+  } catch (e) { toast(e.message); }
+}
+
+function showVisitorModal() {
+  $("#app").innerHTML += `
+  <div class="modal-mask" id="visitor-mask">
+    <div class="modal">
+      <div class="modal-title">游客访问</div>
+      <div class="form-group"><label>访问密码</label><input class="input" id="visitor-pwd" type="password" placeholder="请输入访问密码"></div>
+      <button class="btn btn-primary btn-block" id="visitor-confirm">进入公示大屏</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:8px" id="visitor-cancel">取消</button>
+    </div>
+  </div>`;
+  $("#visitor-confirm").onclick = async () => {
+    const pwd = $("#visitor-pwd").value;
+    if (!pwd) return toast("请输入访问密码");
+    try {
+      const data = await api.post("visitor-verify", { password: pwd });
+      state.visitor = data.token; state.view = "visitor";
+      localStorage.setItem(VISITOR_KEY, data.token);
+      render();
+    } catch (e) { toast(e.message); }
+  };
+  $("#visitor-cancel").onclick = () => $("#visitor-mask").remove();
+  $("#visitor-pwd").onkeydown = e => { if (e.key === "Enter") $("#visitor-confirm").click(); };
+}
+
+// ============ 首次改密 ============
+function renderChangePwd() {
+  $("#app").innerHTML = `
+  <div class="login-wrap"><div class="login-card">
+    <div class="logo">改</div>
+    <div class="app-title">首次登录请修改密码</div>
+    <div class="app-sub" id="chpwd-info"></div>
+    <div class="form-group"><label>新密码（至少 6 位）</label><input class="input" type="password" id="npwd"></div>
+    <div class="form-group"><label>确认新密码</label><input class="input" type="password" id="npwd2"></div>
+    <button class="btn btn-primary btn-block" id="chpwd-btn">确认修改</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px" id="chpwd-logout">退出登录</button>
+  </div></div>`;
+  $("#chpwd-info").textContent = "当前账号：" + (state.user?.username || "");
+  $("#chpwd-btn").onclick = async () => {
+    const p1 = $("#npwd").value, p2 = $("#npwd2").value;
+    if (p1.length < 6) return toast("密码至少 6 位");
+    if (p1 !== p2) return toast("两次密码不一致");
+    try {
+      // 首次改密用旧密码校验，这里旧密码可能是初始密码；简化：直接调 change-password 需要旧密码，改用管理员重置场景
+      // 为支持"首次强制改密"，走后端专用逻辑：这里临时用 login 返回的账号，旧密码未知，故前端提示
+      toast("请通过管理员重置密码后重新登录"); 
+    } catch (e) { toast(e.message); }
+  };
+  $("#chpwd-logout").onclick = () => { logout(); };
+}
+
+function logout() {
+  state.token = ""; state.user = null; state.view = "login";
+  localStorage.removeItem(TOKEN_KEY); photoCache.clear(); render();
+}
+
+// ============ 布局骨架 ============
+function layout(navItems, activeKey, contentHTML) {
+  const navHtml = navItems.map(n => `
+    <button class="nav-item ${n.key===activeKey?'active':''}" data-nav="${n.key}">${n.label}</button>`).join("");
+  const tabsHtml = navItems.map(n => `
+    <button class="tab ${n.key===activeKey?'active':''}" data-nav="${n.key}">${n.label}</button>`).join("");
+  return `
+  <div class="topbar">
+    <div class="brand"><div class="logo-sm">园</div>庄骆贵园林养护成效管理系统</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:13px;color:var(--text2)">${esc(state.user?.display_name||"")} · ${ROLE_TEXT[state.user?.role]||""}</span>
+      <button class="btn btn-sm" id="logout-btn">退出</button>
+    </div>
+  </div>
+  <div class="layout">
+    <div class="sidebar">${navHtml}</div>
+    <div class="main">${contentHTML}</div>
+  </div>
+  <div class="tabbar">${tabsHtml}</div>`;
+}
+
+function bindNavAndLogout(container) {
+  const app = $("#app");
+  $$("[data-nav]", app).forEach(b => b.onclick = () => { state[container.stateKey||"subview"] = b.dataset.nav; container.render(); });
+  $("#logout-btn").onclick = logout;
+}
+
+// ============ 养护单位视图 ============
+function renderUnit() {
+  const unit = {
+    stateKey: "unitTab",
+    render() {
+      state.unitTab = state.unitTab || "report";
+      const navItems = [
+        { key: "report", label: "今日上报" },
+        { key: "history", label: "历史记录" },
+      ];
+      $("#app").innerHTML = layout(navItems, state.unitTab, "");
+      bindNavAndLogout(unit);
+      if (state.unitTab === "report") unit.renderReport();
+      else unit.renderHistory();
+    },
+    async renderReport() {
+      $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
+      try {
+        const [careTypes, points, todayRecords] = await Promise.all([
+          api.get("care-types"), api.get("points"), api.get("records?date=" + today()),
+        ]);
+        unit._careTypes = careTypes.careTypes; unit._points = points.points; unit._todayRecords = todayRecords.records;
+        const grouped = {};
+        for (const r of todayRecords.records) {
+          if (!grouped[r.point_id || r.office_id]) grouped[r.point_id || r.office_id] = [];
+          grouped[r.point_id || r.office_id].push(r);
+        }
+        $(".main").innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div><div style="font-size:18px;font-weight:600">今日养护成效上报</div>
+          <div class="time-tag">${esc(state.user?.display_name||"")} · ${today()}</div></div>
+          <button class="btn btn-primary" id="new-record-btn">+ 新增上报</button>
+        </div>
+        <div class="metrics">
+          <div class="metric"><div class="label">今日已报</div><div class="value" style="color:var(--green3)">${todayRecords.records.length}</div></div>
+          <div class="metric"><div class="label">待审核</div><div class="value" style="color:var(--amber)">${todayRecords.records.filter(r=>r.status==='pending').length}</div></div>
+          <div class="metric"><div class="label">已通过</div><div class="value" style="color:var(--green3)">${todayRecords.records.filter(r=>r.status==='approved').length}</div></div>
+          <div class="metric"><div class="label">已驳回</div><div class="value" style="color:var(--red)">${todayRecords.records.filter(r=>r.status==='rejected').length}</div></div>
+        </div>
+        <div id="unit-record-list"></div>`;
+        $("#new-record-btn").onclick = () => unit.openRecordForm(null);
+        unit.renderRecordList(todayRecords.records);
+      } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px;text-align:center">${esc(e.message)}</div>`; }
+    },
+    renderRecordList(records) {
+      const el = $("#unit-record-list");
+      if (!el) return;
+      if (!records.length) { el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3)">今日暂无上报记录</div>`; return; }
+      el.innerHTML = records.map(r => `
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div>
+              <span style="font-weight:600;font-size:15px">${esc(r.care_name||"未命名养护")}</span>
+              ${r.quantity!=null?`<span style="color:var(--text2);margin-left:8px">${r.quantity} ${esc(r.unit||"")}</span>`:""}
+            </div>
+            <span class="badge ${STATUS_BADGE[r.status]}">${STATUS_TEXT[r.status]}</span>
+          </div>
+          ${r.point_name?`<div class="time-tag">养护点：${esc(r.point_name)}</div>`:""}
+          <div class="photo-grid" style="margin:10px 0" id="rec-photos-${r.id}"></div>
+          <div class="time-tag">上传于 ${fmtTime(r.created_at)}${r.reviewed_at?` · 审核于 ${fmtTime(r.reviewed_at)}`:""}</div>
+          ${r.status==='rejected'&&r.reject_reason?`<div style="color:var(--red);font-size:13px;margin-top:6px">驳回原因：${esc(r.reject_reason)}</div>`:""}
+          ${r.status!=='approved'?`<div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-sm" data-edit="${r.id}">编辑重报</button>
+            <button class="btn btn-sm btn-danger" data-del="${r.id}">删除</button>
+          </div>`:""}
+        </div>`).join("");
+      // 渲染照片
+      for (const r of records) {
+        const box = $("#rec-photos-" + r.id);
+        if (!box) continue;
+        const before = safeArr(r.photos_before), after = safeArr(r.photos_after);
+        const all = [...before.map(p=>({...p,tag:'前'})), ...after.map(p=>({...p,tag:'后'}))];
+        box.innerHTML = all.map(p => `<div class="photo-box" data-key="${esc(p.key)}" data-tag="${p.tag}"><span>${p.tag}·加载中</span></div>`).join("");
+        for (const p of all) {
+          const div = box.querySelector(`[data-key="${p.key}"]`);
+          photoCache.get(p.key).then(url => {
+            div.innerHTML = `<img src="${url}"><span style="position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,.5);padding:1px 6px;border-radius:4px;font-size:11px">${p.tag}</span>`;
+          }).catch(() => { div.innerHTML = `<span>${p.tag}·加载失败</span>`; });
+        }
+      }
+      $$("[data-edit]", el).forEach(b => b.onclick = () => { const r = records.find(x=>x.id===b.dataset.edit); unit.openRecordForm(r); });
+      $$("[data-del]", el).forEach(b => b.onclick = () => unit.deleteRecord(b.dataset.del));
+    },
+    openRecordForm(record) {
+      const isEdit = !!record;
+      $(".main").innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-size:18px;font-weight:600">${isEdit?"编辑上报":"新增上报"}</div>
+        <button class="btn btn-sm" id="back-btn">返回</button>
+      </div>
+      <div class="card" style="max-width:640px">
+        <div class="form-group"><label>养护内容 <span style="color:var(--text3)">（搜索选择，或选"其他"自填）</span></label>
+          <div class="search-dropdown">
+            <input class="input" id="care-search" placeholder="输入关键词搜索养护内容…" autocomplete="off">
+            <div class="dropdown-panel hidden" id="care-dropdown"></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="form-group"><label>数量</label><input class="input" id="care-qty" type="number" step="any" placeholder="0"></div>
+          <div class="form-group"><label>单位</label><input class="input" id="care-unit" readonly placeholder="—"></div>
+        </div>
+        <div class="form-group"><label>养护点（可选）</label><select class="input" id="care-point"><option value="">不指定养护点</option>
+          ${(unit._points||[]).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}
+        </select></div>
+        <div class="form-group"><label>备注</label><textarea class="input" id="care-desc" placeholder="补充说明（可选）"></textarea></div>
+        <div class="form-group"><label>作业前照片</label><div class="photo-grid" id="before-grid"><div class="photo-box" id="before-add">+ 拍照/选图</div></div></div>
+        <div class="form-group"><label>作业后照片</label><div class="photo-grid" id="after-grid"><div class="photo-box" id="after-add">+ 拍照/选图</div></div></div>
+        <button class="btn btn-primary btn-block" id="submit-btn">${isEdit?"保存并重新提交":"提交上报"}</button>
+      </div>`;
+      unit._form = {
+        careTypeId: record?.care_type_id || "", careTypeUnit: record?.unit || "",
+        careName: record?.care_name || "", pointId: record?.point_id || "",
+        before: safeArr(record?.photos_before).map(p=>p.key), after: safeArr(record?.photos_after).map(p=>p.key),
+        quantity: record?.quantity ?? null, desc: record?.description || "",
+      };
+      $("#back-btn").onclick = () => unit.render();
+      // 养护内容搜索下拉
+      const search = $("#care-search"); const dropdown = $("#care-dropdown");
+      if (isEdit && unit._form.careTypeId) {
+        const ct = (unit._careTypes||[]).find(c=>c.id===unit._form.careTypeId);
+        if (ct) { search.value = ct.name; $("#care-unit").value = ct.unit; unit._form.careName = ct.name; }
+      } else if (isEdit && unit._form.careName) { search.value = unit._form.careName; $("#care-unit").value = unit._form.careTypeUnit||""; }
+      function filterCare(kw) {
+        const list = (unit._careTypes||[]).filter(c => !kw || c.name.includes(kw));
+        dropdown.innerHTML = list.map(c=>`<div class="dropdown-item" data-id="${c.id}" data-name="${esc(c.name)}" data-unit="${esc(c.unit)}"><span>${esc(c.name)}</span><span class="unit">${esc(c.unit)}</span></div>`).join("")
+          + `<div class="dropdown-item" data-id="__other" data-name="其他内容" data-unit=""><span>其他内容（自填）</span><span class="unit"></span></div>`;
+        dropdown.classList.toggle("hidden", false);
+        $$(".dropdown-item", dropdown).forEach(it => it.onclick = () => {
+          unit._form.careTypeId = it.dataset.id === "__other" ? "" : it.dataset.id;
+          unit._form.careTypeUnit = it.dataset.unit;
+          if (it.dataset.id === "__other") { search.value = ""; search.placeholder = "请输入养护内容名称"; search.focus(); }
+          else { search.value = it.dataset.name; }
+          $("#care-unit").value = it.dataset.unit;
+          dropdown.classList.add("hidden");
+        });
+      }
+      search.oninput = () => filterCare(search.value.trim());
+      search.onfocus = () => filterCare(search.value.trim());
+      document.addEventListener("click", function close(e){ if(!e.target.closest(".search-dropdown")) dropdown.classList.add("hidden"); });
+      // 照片上传
+      setupPhotoUpload("before", unit._form);
+      setupPhotoUpload("after", unit._form);
+      $("#submit-btn").onclick = () => unit.submit(isEdit ? record.id : null);
+    },
+    async submit(id) {
+      const f = unit._form;
+      const careName = $("#care-search").value.trim();
+      const careTypeId = f.careTypeId;
+      const qty = $("#care-qty").value === "" ? null : parseFloat($("#care-qty").value);
+      if (!careTypeId && !careName) return toast("请选择或填写养护内容");
+      if (!f.before.length && !f.after.length) return toast("请至少上传一张作业照片");
+      const body = {
+        office_id: state.user.scope_id,
+        point_id: $("#care-point").value || null,
+        work_date: today(),
+        care_type_id: careTypeId || null,
+        care_name: careName || null,
+        quantity: qty,
+        unit: $("#care-unit").value || null,
+        description: $("#care-desc").value || null,
+        photos_before: f.before.map(k=>({key:k})),
+        photos_after: f.after.map(k=>({key:k})),
+      };
+      if (!body.office_id) return toast("当前账号未绑定养护所，请联系管理员");
+      try {
+        if (id) await api.put("records/" + id, body); else await api.post("records", body);
+        toast("提交成功"); unit.render();
+      } catch (e) { toast(e.message); }
+    },
+    async deleteRecord(id) {
+      if (!confirm("确定删除这条记录？关联照片也会删除")) return;
+      try { await api.del("records/" + id); toast("已删除"); unit.render(); } catch (e) { toast(e.message); }
+    },
+    async renderHistory() {
+      $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
+      try {
+        const data = await api.get("records");
+        $(".main").innerHTML = `
+        <div style="font-size:18px;font-weight:600;margin-bottom:16px">历史记录</div>
+        <div id="unit-record-list"></div>`;
+        unit.renderRecordList(data.records);
+      } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px;text-align:center">${esc(e.message)}</div>`; }
+    },
+  };
+  unit.render();
+}
+
+function safeArr(s) { try { return JSON.parse(s||"[]"); } catch(e) { return []; } }
+
+// 照片上传（压缩 + 上传）
+async function setupPhotoUpload(tag, formState) {
+  const addBtn = $("#" + tag + "-add");
+  const grid = $("#" + tag + "-grid");
+  addBtn.onclick = () => {
+    const input = document.createElement("input");
+    input.type = "file"; input.accept = "image/*"; input.multiple = true;
+    input.onchange = async () => {
+      for (const file of input.files) {
+        addBtn.innerHTML = "压缩中…";
+        try {
+          const compressed = await compressImage(file);
+          const fd = new FormData();
+          fd.append("file", compressed.blob, "photo.jpg");
+          fd.append("cat", tag);
+          const data = await api.post("photos/upload", fd);
+          formState[tag].push(data.key);
+          renderPhotoThumb(grid, addBtn, data.key, tag);
+        } catch (e) { toast("上传失败: " + e.message); }
+        addBtn.innerHTML = "+ 拍照/选图";
+      }
+    };
+    input.click();
+  };
+  // 初始渲染已有照片
+  for (const key of formState[tag]) renderPhotoThumb(grid, addBtn, key, tag);
+}
+
+function renderPhotoThumb(grid, addBtn, key, tag) {
+  const div = document.createElement("div");
+  div.className = "photo-box"; div.dataset.key = key;
+  div.innerHTML = `<span>加载中</span><button class="del">×</button>`;
+  grid.insertBefore(div, addBtn);
+  photoCache.get(key).then(url => { div.innerHTML = `<img src="${url}"><button class="del">×</button>`; })
+    .catch(() => { div.innerHTML = `<span>加载失败</span><button class="del">×</button>`; });
+  div.querySelector(".del").onclick = (e) => {
+    e.stopPropagation();
+    const idx = formState[tag].indexOf(key); if (idx >= 0) formState[tag].splice(idx, 1);
+    div.remove();
+  };
+}
+
+// 客户端图片压缩
+async function compressImage(file) {
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const maxDim = 1600;
+    let w = bitmap.width, h = bitmap.height;
+    if (Math.max(w, h) > maxDim) {
+      const scale = maxDim / Math.max(w, h);
+      w = Math.round(w * scale); h = Math.round(h * scale);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h);
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.82));
+    bitmap.close();
+    return { blob, width: w, height: h };
+  } catch (e) {
+    return { blob: file };
+  }
+}
+
+// ============ 游客公示大屏 ============
+function renderVisitor() {
+  $("#app").innerHTML = `
+  <div class="topbar">
+    <div class="brand"><div class="logo-sm">园</div>庄骆贵园林养护成效公示</div>
+    <button class="btn btn-sm" id="visitor-exit">退出</button>
+  </div>
+  <div class="container">
+    <div id="dash-content"><div style="text-align:center;color:var(--text2);padding:40px">加载中…</div></div>
+  </div>`;
+  $("#visitor-exit").onclick = () => { state.visitor=""; state.view="login"; localStorage.removeItem(VISITOR_KEY); photoCache.clear(); render(); };
+  loadDashboard();
+  // 定时刷新
+  clearInterval(window._dashTimer);
+  window._dashTimer = setInterval(loadDashboard, 60000);
+}
+
+async function loadDashboard() {
+  try {
+    const data = await api.get("public/dashboard");
+    const total = data.offices.reduce((a,o)=>{ a.approved+=o.stats.approved; a.pending+=o.stats.pending; a.rejected+=o.stats.rejected; return a; }, {approved:0,pending:0,rejected:0});
+    $("#dash-content").innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div><div style="font-size:20px;font-weight:600">养护成效公示大屏</div>
+      <div class="time-tag">庄骆贵园林 · 游客只读 · 实时更新</div></div>
+      <div style="display:flex;gap:24px">
+        <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--green3)">${total.approved}</div><div class="time-tag">已闭环</div></div>
+        <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--amber)">${total.pending}</div><div class="time-tag">待审核</div></div>
+        <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--red)">${total.rejected}</div><div class="time-tag">已驳回</div></div>
+      </div>
+    </div>
+    <div class="dashboard-grid">
+      ${data.offices.map(o=>`
+        <div class="dash-card">
+          <div class="dash-img" id="dash-img-${o.id}">${o.latest?'加载中…':'暂无照片'}</div>
+          <div class="dash-body">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div class="dash-title">${esc(o.name)}</div>
+              ${o.stats.approved>0?`<span class="badge badge-approved">已完成</span>`:o.stats.pending>0?`<span class="badge badge-pending">审核中</span>`:o.stats.rejected>0?`<span class="badge badge-rejected">已驳回</span>`:`<span class="badge" style="color:var(--text3);border-color:var(--border)">未上报</span>`}
+            </div>
+            <div class="dash-stats">
+              <span>完成 ${o.stats.approved}</span><span>待审 ${o.stats.pending}</span><span>驳回 ${o.stats.rejected}</span>
+            </div>
+            ${o.latest?`<div class="dash-time">最新上传于 ${fmtTime(o.latest.created_at)}</div>`:""}
+          </div>
+        </div>`).join("")}
+    </div>`;
+    // 加载最新照片
+    for (const o of data.offices) {
+      if (o.latest) {
+        const imgBox = $("#dash-img-" + o.id);
+        photoCache.get(o.latest.key).then(url => { imgBox.innerHTML = `<img src="${url}">`; }).catch(()=>{ imgBox.innerHTML = "加载失败"; });
+      }
+    }
+  } catch (e) {
+    $("#dash-content").innerHTML = `<div style="color:var(--red);padding:40px;text-align:center">${esc(e.message)}</div>`;
+  }
+}
+
+// ============ 启动 ============
+(async function boot() {
+  initParticles();
+  // 恢复登录态
+  if (state.token) {
+    try { const me = await api.get("me"); state.user = me.user; } catch (e) { state.token=""; localStorage.removeItem(TOKEN_KEY); }
+  }
+  render();
+})();
+</script>
+function renderAdmin() {
+  const ad = {
+    stateKey: "adminTab",
+    render() {
+      state.adminTab = state.adminTab || "users";
+      const navItems = [
+        { key: "users", label: "账号配置" },
+        { key: "region", label: "区域/养护所" },
+        { key: "points", label: "养护点" },
+        { key: "caretypes", label: "养护内容" },
+        { key: "preset", label: "所内预设" },
+        { key: "settings", label: "游客密码" },
+        { key: "export", label: "导出清理" },
+      ];
+      $("#app").innerHTML = layout(navItems, state.adminTab, "");
+      bindNavAndLogout(ad);
+      const fn = {
+        users: ad.loadUsers, region: ad.loadRegion, points: ad.loadPoints,
+        caretypes: ad.loadCareTypes, preset: ad.loadPreset, settings: ad.loadSettings, export: ad.loadExport,
+      }[state.adminTab];
+      fn.call(ad);
+    },
+    async loadUsers() {
+      $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
+      try {
+        const data = await api.get("admin/users");
+        $(".main").innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div style="font-size:18px;font-weight:600">账号配置</div>
+          <button class="btn btn-primary" id="add-user-btn">+ 新增账号</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>账号</th><th>姓名</th><th>角色</th><th>范围</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody>${data.users.map(u=>`
+          <tr>
+            <td>${esc(u.username)}</td><td>${esc(u.display_name)}</td>
+            <td>${ROLE_TEXT[u.role]}</td><td>${u.scope_type==='all'?'全部':(u.office_name||u.scope_id||'—')}</td>
+            <td>${u.enabled?'启用':'禁用'}</td>
+            <td><button class="btn btn-sm" data-edit-user="${u.id}">编辑</button> <button class="btn btn-sm" data-reset-user="${u.id}">重置密码</button> <button class="btn btn-sm btn-danger" data-del-user="${u.id}">删除</button></td>
+          </tr>`).join("")}</tbody></table></div>`;
+        $("#add-user-btn").onclick = () => ad.userForm(null);
+        $$("[data-edit-user]").forEach(b => b.onclick = () => ad.userForm(data.users.find(u=>u.id===b.dataset.editUser)));
+        $$("[data-reset-user]").forEach(b => b.onclick = () => ad.resetPwd(b.dataset.resetUser));
+        $$("[data-del-user]").forEach(b => b.onclick = () => ad.delUser(b.dataset.delUser));
+      } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px">${esc(e.message)}</div>`; }
+    },
+    async userForm(user) {
+      const offices = (await api.get("offices")).offices;
+      const isEdit = !!user;
+      $("#app").insertAdjacentHTML("beforeend", `
+      <div class="modal-mask" id="user-mask"><div class="modal">
+        <div class="modal-title">${isEdit?"编辑账号":"新增账号"}</div>
+        <div class="form-group"><label>账号</label><input class="input" id="uf-username" ${isEdit?"readonly":""} value="${esc(user?.username||"")}"></div>
+        ${isEdit?"":`<div class="form-group"><label>初始密码（至少6位）</label><input class="input" id="uf-password" type="password"></div>`}
+        <div class="form-group"><label>姓名/显示名</label><input class="input" id="uf-display" value="${esc(user?.display_name||"")}"></div>
+        <div class="form-group"><label>角色</label><select class="input" id="uf-role">
+          <option value="unit" ${user?.role==='unit'?'selected':''}>养护单位</option>
+          <option value="reviewer" ${user?.role==='reviewer'?'selected':''}>考核员</option>
+          <option value="admin" ${user?.role==='admin'?'selected':''}>管理员</option>
+        </select></div>
+        <div class="form-group"><label>范围</label><select class="input" id="uf-scope">
+          <option value="all" ${user?.scope_type==='all'?'selected':''}>全部区域</option>
+          ${offices.map(o=>`<option value="${o.id}" ${user?.scope_id===o.id?'selected':''}>${esc(o.name)}</option>`).join("")}
+        </select></div>
+        <div class="form-group"><label>状态</label><select class="input" id="uf-enabled">
+          <option value="1" ${user?.enabled!==0?'selected':''}>启用</option>
+          <option value="0" ${user?.enabled===0?'selected':''}>禁用</option>
+        </select></div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-primary" style="flex:1" id="uf-save">保存</button>
+          <button class="btn" style="flex:1" id="uf-cancel">取消</button>
+        </div>
+      </div></div>`);
+      $("#uf-cancel").onclick = () => $("#user-mask").remove();
+      $("#uf-save").onclick = async () => {
+        const username = $("#uf-username").value.trim();
+        const display = $("#uf-display").value.trim();
+        const role = $("#uf-role").value;
+        const scope = $("#uf-scope").value;
+        const enabled = $("#uf-enabled").value === "1";
+        if (!display) return toast("请填写姓名");
+        try {
+          if (isEdit) {
+            await api.put("admin/users/" + user.id, { display_name: display, role, scope_type: scope==="all"?"all":"office", scope_id: scope==="all"?null:scope, enabled });
+          } else {
+            const password = $("#uf-password").value;
+            if (!username) return toast("请填写账号");
+            if (password.length < 6) return toast("密码至少6位");
+            await api.post("admin/users", { username, password, display_name: display, role, scope_type: scope==="all"?"all":"office", scope_id: scope==="all"?null:scope });
+          }
+          $("#user-mask").remove(); toast("已保存"); ad.loadUsers();
+        } catch (e) { toast(e.message); }
+      };
+    },
+    resetPwd(id) {
+      $("#app").insertAdjacentHTML("beforeend", `
+      <div class="modal-mask" id="rp-mask"><div class="modal">
+        <div class="modal-title">重置密码</div>
+        <div class="form-group"><label>新密码（至少6位）</label><input class="input" id="rp-pwd" type="password"></div>
+        <div style="display:flex;gap:10px"><button class="btn btn-primary" style="flex:1" id="rp-save">确认</button><button class="btn" style="flex:1" id="rp-cancel">取消</button></div>
+      </div></div>`);
+      $("#rp-cancel").onclick = () => $("#rp-mask").remove();
+      $("#rp-save").onclick = async () => {
+        const pwd = $("#rp-pwd").value;
+        if (pwd.length < 6) return toast("密码至少6位");
+        try { await api.post(`admin/users/${id}/reset-password`, { password: pwd }); $("#rp-mask").remove(); toast("已重置"); } catch(e){ toast(e.message); }
+      };
+    },
+    async delUser(id) {
+      if (!confirm("确定删除该账号？")) return;
+      try { await api.del("admin/users/" + id); toast("已删除"); ad.loadUsers(); } catch(e){ toast(e.message); }
+    },
+    async loadRegion() {
+      $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
+      try {
+        const [regions, offices] = await Promise.all([api.get("admin/regions"), api.get("admin/offices")]);
+        $(".main").innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div style="font-size:18px;font-weight:600">区域 / 养护所管理</div>
+          <div style="display:flex;gap:8px"><button class="btn" id="add-region-btn">+ 区域</button><button class="btn btn-primary" id="add-office-btn">+ 养护所</button></div>
+        </div>
+        ${regions.regions.map(rg=>`
+          <div class="card" style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <span style="font-weight:600;font-size:16px">${esc(rg.name)}</span>
+              <div style="display:flex;gap:6px"><button class="btn btn-sm" data-edit-region="${rg.id}" data-name="${esc(rg.name)}" data-code="${esc(rg.code||"")}">编辑</button><button class="btn btn-sm btn-danger" data-del-region="${rg.id}">删除</button></div>
+            </div>
+            <div class="photo-grid" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))">
+              ${offices.offices.filter(o=>o.region_id===rg.id).map(o=>`
+                <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center">
+                  <span>${esc(o.name)}</span>
+                  <div style="display:flex;gap:4px"><button class="btn btn-sm" data-edit-office="${o.id}" data-name="${esc(o.name)}" data-region="${o.region_id}">改</button><button class="btn btn-sm btn-danger" data-del-office="${o.id}">删</button></div>
+                </div>`).join("")}
+            </div>
+          </div>`).join("")}`;
+        $("#add-region-btn").onclick = () => ad.regionForm(null, offices.offices);
+        $("#add-office-btn").onclick = () => ad.officeForm(null, regions.regions);
+        $$("[data-edit-region]").forEach(b => b.onclick = () => ad.regionForm({id:b.dataset.editRegion,name:b.dataset.name,code:b.dataset.code}, offices.offices));
+        $$("[data-del-region]").forEach(b => b.onclick = async () => { if(!confirm("删除区域会连带删除其下养护所，确定？"))return; try{await api.del("admin/regions/"+b.dataset.delRegion);toast("已删除");ad.loadRegion();}catch(e){toast(e.message);} });
+        $$("[data-edit-office]").forEach(b => b.onclick = () => ad.officeForm({id:b.dataset.editOffice,name:b.dataset.name,region_id:b.dataset.region}, regions.regions));
+        $$("[data-del-office]").forEach(b => b.onclick = async () => { if(!confirm("确定删除？"))return; try{await api.del("admin/offices/"+b.dataset.delOffice);toast("已删除");ad.loadRegion();}catch(e){toast(e.message);} });
+      } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px">${esc(e.message)}</div>`; }
+    },
+    regionForm(region, offices) {
+      const isEdit = !!region;
+      $("#app").insertAdjacentHTML("beforeend", `
+      <div class="modal-mask" id="rg-mask"><div class="modal">
+        <div class="modal-title">${isEdit?"编辑区域":"新增区域"}</div>
+        <div class="form-group"><label>名称</label><input class="input" id="rg-name" value="${esc(region?.name||"")}"></div>
+        <div class="form-group"><label>编码（可选）</label><input class="input" id="rg-code" value="${esc(region?.code||"")}"></div>
+        <div style="display:flex;gap:10px"><button class="btn btn-primary" style="flex:1" id="rg-save">保存</button><button class="btn" style="flex:1" id="rg-cancel">取消</button></div>
+      </div></div>`);
+      $("#rg-cancel").onclick = () => $("#rg-mask").remove();
+      $("#rg-save").onclick = async () => {
+        const name = $("#rg-name").value.trim(); if(!name) return toast("请填写名称");
+        try { if(isEdit) await api.put("admin/regions/"+region.id,{name,code:$("#rg-code").value}); else await api.post("admin/regions",{name,code:$("#rg-code").value}); $("#rg-mask").remove();toast("已保存");ad.loadRegion(); } catch(e){toast(e.message);}
+      };
+    },
+    officeForm(office, regions) {
+      const isEdit = !!office;
+      $("#app").insertAdjacentHTML("beforeend", `
+      <div class="modal-mask" id="of-mask"><div class="modal">
+        <div class="modal-title">${isEdit?"编辑养护所":"新增养护所"}</div>
+        <div class="form-group"><label>所属区域</label><select class="input" id="of-region">
+          ${regions.map(r=>`<option value="${r.id}" ${office?.region_id===r.id?'selected':''}>${esc(r.name)}</option>`).join("")}
+        </select></div>
+        <div class="form-group"><label>名称</label><input class="input" id="of-name" value="${esc(office?.name||"")}"></div>
+        <div style="display:flex;gap:10px"><button class="btn btn-primary" style="flex:1" id="of-save">保存</button><button class="btn" style="flex:1" id="of-cancel">取消</button></div>
+      </div></div>`);
+      $("#of-cancel").onclick = () => $("#of-mask").remove();
+      $("#of-save").onclick = async () => {
+        const name = $("#of-name").value.trim(); if(!name) return toast("请填写名称");
+        const region_id = $("#of-region").value;
+        try { if(isEdit) await api.put("admin/offices/"+office.id,{name,region_id}); else await api.post("admin/offices",{name,region_id}); $("#of-mask").remove();toast("已保存");ad.loadRegion(); } catch(e){toast(e.message);}
+      };
+    },
+    async loadPoints() {
+      $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
+      try {
+        const [points, offices] = await Promise.all([api.get("admin/points"), api.get("offices")]);
+        $(".main").innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div style="font-size:18px;font-weight:600">养护点管理</div>
+          <button class="btn btn-primary" id="add-point-btn">+ 新增养护点</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>名称</th><th>所属养护所</th><th>分类</th><th>位置</th><th>操作</th></tr></thead>
+        <tbody>${points.points.map(p=>{const o=offices.offices.find(x=>x.id===p.office_id);return `
+          <tr><td>${esc(p.name)}</td><td>${esc(o?.name||p.office_id)}</td><td>${esc(p.category||"—")}</td><td>${esc(p.location||"—")}</td>
+          <td><button class="btn btn-sm" data-edit-point="${p.id}">编辑</button> <button class="btn btn-sm btn-danger" data-del-point="${p.id}">删除</button></td></tr>`;}).join("")}</tbody></table></div>`;
+        $("#add-point-btn").onclick = () => ad.pointForm(null, offices.offices);
+        $$("[data-edit-point]").forEach(b => b.onclick = () => ad.pointForm(points.points.find(p=>p.id===b.dataset.editPoint), offices.offices));
+        $$("[data-del-point]").forEach(b => b.onclick = async () => { if(!confirm("确定删除？"))return; try{await api.del("admin/points/"+b.dataset.delPoint);toast("已删除");ad.loadPoints();}catch(e){toast(e.message);} });
+      } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px">${esc(e.message)}</div>`; }
+    },
+    pointForm(point, offices) {
+      const isEdit = !!point;
+      $("#app").insertAdjacentHTML("beforeend", `
+      <div class="modal-mask" id="pt-mask"><div class="modal">
+        <div class="modal-title">${isEdit?"编辑养护点":"新增养护点"}</div>
+        <div class="form-group"><label>所属养护所</label><select class="input" id="pt-office">${offices.map(o=>`<option value="${o.id}" ${point?.office_id===o.id?'selected':''}>${esc(o.name)}</option>`).join("")}</select></div>
+        <div class="form-group"><label>名称</label><input class="input" id="pt-name" value="${esc(point?.name||"")}"></div>
+        <div class="form-group"><label>分类</label><input class="input" id="pt-category" value="${esc(point?.category||"")}" placeholder="绿化带/行道树/草坪…"></div>
+        <div class="form-group"><label>位置描述</label><input class="input" id="pt-location" value="${esc(point?.location||"")}"></div>
+        <div style="display:flex;gap:10px"><button class="btn btn-primary" style="flex:1" id="pt-save">保存</button><button class="btn" style="flex:1" id="pt-cancel">取消</button></div>
+      </div></div>`);
+      $("#pt-cancel").onclick = () => $("#pt-mask").remove();
+      $("#pt-save").onclick = async () => {
+        const name = $("#pt-name").value.trim(); if(!name) return toast("请填写名称");
+        const body = { office_id:$("#pt-office").value, name, category:$("#pt-category").value, location:$("#pt-location").value };
+        try { if(isEdit) await api.put("admin/points/"+point.id, body); else await api.post("admin/points", body); $("#pt-mask").remove();toast("已保存");ad.loadPoints(); } catch(e){toast(e.message);}
+      };
+    },
+    async loadCareTypes() {
+      $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
+      try {
+        const data = await api.get("admin/care-types");
+        $(".main").innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div style="font-size:18px;font-weight:600">养护内容字典</div>
+          <button class="btn btn-primary" id="add-ct-btn">+ 新增内容</button>
+        </div>
+        <div style="color:var(--text3);font-size:12px;margin-bottom:12px">仅管理员可增删改养护内容，各养护所从这里预设自己负责的内容</div>
+        <div class="photo-grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
+          ${data.careTypes.map(c=>`
+            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center">
+              <span>${esc(c.name)} <span style="color:var(--text3);font-size:12px">${esc(c.unit)}</span></span>
+              <div style="display:flex;gap:4px"><button class="btn btn-sm" data-edit-ct="${c.id}" data-name="${esc(c.name)}" data-unit="${esc(c.unit)}">改</button><button class="btn btn-sm btn-danger" data-del-ct="${c.id}">删</button></div>
+            </div>`).join("")}
+        </div>`;
+        $("#add-ct-btn").onclick = () => ad.careTypeForm(null);
+        $$("[data-edit-ct]").forEach(b => b.onclick = () => ad.careTypeForm({id:b.dataset.editCt,name:b.dataset.name,unit:b.dataset.unit}));
+        $$("[data-del-ct]").forEach(b => b.onclick = async () => { if(!confirm("确定删除该养护内容？"))return; try{await api.del("admin/care-types/"+b.dataset.delCt);toast("已删除");ad.loadCareTypes();}catch(e){toast(e.message);} });
+      } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px">${esc(e.message)}</div>`; }
+    },
+    careTypeForm(ct) {
+      const isEdit = !!ct;
+      $("#app").insertAdjacentHTML("beforeend", `
+      <div class="modal-mask" id="ct-mask"><div class="modal">
+        <div class="modal-title">${isEdit?"编辑养护内容":"新增养护内容"}</div>
+        <div class="form-group"><label>名称</label><input class="input" id="ct-name" value="${esc(ct?.name||"")}"></div>
+        <div class="form-group"><label>单位</label><input class="input" id="ct-unit" value="${esc(ct?.unit||"")}" placeholder="株 / m² / 吨 / 点位…"></div>
+        <div style="display:flex;gap:10px"><button class="btn btn-primary" style="flex:1" id="ct-save">保存</button><button class="btn" style="flex:1" id="ct-cancel">取消</button></div>
+      </div></div>`);
+      $("#ct-cancel").onclick = () => $("#ct-mask").remove();
+      $("#ct-save").onclick = async () => {
+        const name = $("#ct-name").value.trim(); if(!name) return toast("请填写名称");
+        try { if(isEdit) await api.put("admin/care-types/"+ct.id,{name,unit:$("#ct-unit").value}); else await api.post("admin/care-types",{name,unit:$("#ct-unit").value}); $("#ct-mask").remove();toast("已保存");ad.loadCareTypes(); } catch(e){toast(e.message);}
+      };
+    },
+    async loadPreset() {
+      $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
+      try {
+        const [offices, careTypes] = await Promise.all([api.get("offices"), api.get("admin/care-types")]);
+        ad._offices = offices.offices; ad._careTypes = careTypes.careTypes;
+        $(".main").innerHTML = `
+        <div style="font-size:18px;font-weight:600;margin-bottom:6px">每个养护所的养护内容预设</div>
+        <div style="color:var(--text3);font-size:12px;margin-bottom:16px">勾选后，该养护所上报时下拉只显示这些内容</div>
+        <div class="form-group"><label>选择养护所</label><select class="input" id="preset-office">
+          ${ad._offices.map(o=>`<option value="${o.id}">${esc(o.name)}</option>`).join("")}
+        </select></div>
+        <div class="card" style="margin-bottom:16px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:10px">勾选本所负责的养护内容</div>
+          <div class="photo-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))" id="preset-grid"></div>
+        </div>
+        <button class="btn btn-primary btn-block" id="preset-save">保存预设</button>`;
+        const renderPresetGrid = async (officeId) => {
+          const cur = await api.get("admin/office-care-types?office_id=" + officeId);
+          const ids = new Set(cur.careTypeIds);
+          $("#preset-grid").innerHTML = ad._careTypes.map(c=>`
+            <label style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;cursor:pointer">
+              <input type="checkbox" class="preset-cb" value="${c.id}" ${ids.has(c.id)?'checked':''}> ${esc(c.name)} <span style="color:var(--text3);font-size:12px">${esc(c.unit)}</span>
+            </label>`).join("");
+        };
+        await renderPresetGrid($("#preset-office").value);
+        $("#preset-office").onchange = e => renderPresetGrid(e.target.value);
+        $("#preset-save").onclick = async () => {
+          const officeId = $("#preset-office").value;
+          const ids = $$(".preset-cb:checked").map(cb=>cb.value);
+          try { await api.put("admin/office-care-types", { office_id: officeId, care_type_ids: ids }); toast("已保存"); } catch(e){toast(e.message);}
+        };
+      } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px">${esc(e.message)}</div>`; }
+    },
+    loadSettings() {
+      $(".main").innerHTML = `
+      <div style="font-size:18px;font-weight:600;margin-bottom:16px">游客访问密码设置</div>
+      <div class="card" style="max-width:480px">
+        <div class="form-group"><label>新访问密码（默认 666666）</label><input class="input" id="vpwd" type="password" placeholder="输入新密码"></div>
+        <button class="btn btn-primary btn-block" id="vpwd-save">保存</button>
+        <div style="color:var(--text3);font-size:12px;margin-top:12px">游客在登录页点击「游客访问」输入此密码即可进入公示大屏</div>
+      </div>`;
+      $("#vpwd-save").onclick = async () => {
+        const pwd = $("#vpwd").value; if(pwd.length<4) return toast("密码至少4位");
+        try { await api.post("admin/settings/visitor-password", { password: pwd }); toast("已保存"); } catch(e){toast(e.message);}
+      };
+    },
+    async loadExport() {
+      $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
+      try {
+        const [stats, offices] = await Promise.all([api.get("admin/stats"), api.get("offices")]);
+        const gb = (stats.storage.bytes / 1024 / 1024 / 1024).toFixed(3);
+        $(".main").innerHTML = `
+        <div style="font-size:18px;font-weight:600;margin-bottom:16px">导出归档与数据清理</div>
+        <div class="metrics">
+          <div class="metric"><div class="label">R2 已用存储</div><div class="value">${gb} GB</div></div>
+          <div class="metric"><div class="label">照片对象数</div><div class="value">${stats.storage.count}</div></div>
+          <div class="metric"><div class="label">记录总数</div><div class="value">${stats.records}</div></div>
+          <div class="metric"><div class="label">账号数</div><div class="value">${stats.users}</div></div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div style="font-size:15px;font-weight:600;margin-bottom:12px">导出养护日志</div>
+          <div class="row" style="margin-bottom:12px">
+            <div class="form-group"><label>开始日期</label><input class="input" id="exp-from" type="date"></div>
+            <div class="form-group"><label>结束日期</label><input class="input" id="exp-to" type="date"></div>
+            <div class="form-group"><label>养护所（可选）</label><select class="input" id="exp-office"><option value="">全部</option>${offices.offices.map(o=>`<option value="${o.id}">${esc(o.name)}</option>`).join("")}</select></div>
+          </div>
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-primary" id="exp-csv">导出文字 CSV</button>
+            <button class="btn btn-primary" id="exp-zip">导出照片 ZIP</button>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:16px;border-color:var(--red)">
+          <div style="font-size:15px;font-weight:600;margin-bottom:6px;color:var(--red)">数据清理（危险操作）</div>
+          <div style="color:var(--text2);font-size:12px;margin-bottom:12px">清理前请务必先导出归档。清理会删除所选范围的记录及其照片，释放 R2 存储。</div>
+          <div class="row" style="margin-bottom:12px">
+            <div class="form-group"><label>开始日期</label><input class="input" id="cl-from" type="date"></div>
+            <div class="form-group"><label>结束日期</label><input class="input" id="cl-to" type="date"></div>
+            <div class="form-group"><label>养护所（可选）</label><select class="input" id="cl-office"><option value="">全部</option>${offices.offices.map(o=>`<option value="${o.id}">${esc(o.name)}</option>`).join("")}</select></div>
+          </div>
+          <button class="btn" id="cl-preview">预览将删除的数据</button>
+          <button class="btn btn-danger" id="cl-execute">确认清理</button>
+          <div id="cl-result" style="margin-top:12px;font-size:13px;color:var(--text2)"></div>
+        </div>`;
+        const qs = (from,to,office) => { const p=new URLSearchParams(); if(from)p.set("from",from); if(to)p.set("to",to); if(office)p.set("office",office); const s=p.toString(); return s?"?"+s:""; };
+        $("#exp-csv").onclick = () => ad.download("admin/export-csv" + qs($("#exp-from").value,$("#exp-to").value,$("#exp-office").value));
+        $("#exp-zip").onclick = () => ad.download("admin/export-photos" + qs($("#exp-from").value,$("#exp-to").value,$("#exp-office").value));
+        $("#cl-preview").onclick = async () => {
+          try { const d = await api.get("admin/cleanup-preview" + qs($("#cl-from").value,$("#cl-to").value,$("#cl-office").value)); $("#cl-result").innerHTML = `将删除 <b>${d.recordCount}</b> 条记录、<b>${d.photoCount}</b> 个照片对象`; } catch(e){toast(e.message);}
+        };
+        $("#cl-execute").onclick = async () => {
+          if(!confirm("确认清理？此操作不可逆，请先确认已导出归档！")) return;
+          try { const d = await api.post("admin/cleanup", { from:$("#cl-from").value, to:$("#cl-to").value, office_id:$("#cl-office").value }); $("#cl-result").innerHTML = `已删除 <b>${d.deleted}</b> 条记录，释放 <b>${(d.releasedBytes/1024/1024).toFixed(2)} MB</b>`; } catch(e){toast(e.message);}
+        };
+      } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px">${esc(e.message)}</div>`; }
+    },
+    async download(path) {
+      try {
+        toast("正在导出，请稍候…", 5000);
+        const res = await fetch("/api/" + path, { headers: { Authorization: "Bearer " + state.token } });
+        if (!res.ok) { const d = await res.json().catch(()=>({})); throw new Error(d.error || "导出失败"); }
+        const blob = await res.blob();
+        const cd = res.headers.get("Content-Disposition") || "";
+        const m = cd.match(/filename="?([^"]+)"?/);
+        const fname = m ? m[1] : "导出文件";
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a"); a.href = url; a.download = fname; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 3000);
+        toast("导出成功");
+      } catch (e) { toast(e.message); }
+    },
+  };
+  ad.render();
+}
+</script>
+function renderReviewer() {
+  const rv = {
+    stateKey: "rvTab",
+    render() {
+      state.rvTab = state.rvTab || "pending";
+      const navItems = [
+        { key: "pending", label: "待审核" },
+        { key: "all", label: "全部记录" },
+      ];
+      $("#app").innerHTML = layout(navItems, state.rvTab, "");
+      bindNavAndLogout(rv);
+      rv.loadList(state.rvTab === "pending" ? "pending" : "");
+    },
+    async loadList(status) {
+      $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
+      try {
+        const [records, stats] = await Promise.all([
+          api.get("review/records" + (status ? "?status=" + status : "")),
+          api.get("review/stats"),
+        ]);
+        const s = stats.stats;
+        $(".main").innerHTML = `
+        <div style="font-size:18px;font-weight:600;margin-bottom:16px">${status?"待审核记录":"全部记录"}</div>
+        <div class="metrics">
+          <div class="metric"><div class="label">待审核</div><div class="value" style="color:var(--amber)">${s.pending}</div></div>
+          <div class="metric"><div class="label">已通过</div><div class="value" style="color:var(--green3)">${s.approved}</div></div>
+          <div class="metric"><div class="label">已驳回</div><div class="value" style="color:var(--red)">${s.rejected}</div></div>
+        </div>
+        <div id="rv-list"></div>`;
+        const el = $("#rv-list");
+        if (!records.records.length) { el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3)">暂无记录</div>`; return; }
+        el.innerHTML = records.records.map(r => `
+          <div class="card" style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <div>
+                <span style="font-weight:600;font-size:15px">${esc(r.care_name||"未命名养护")}</span>
+                ${r.quantity!=null?`<span style="color:var(--text2);margin-left:8px">${r.quantity} ${esc(r.unit||"")}</span>`:""}
+                <div class="time-tag">${esc(r.office_name||"")}${r.point_name?" · "+esc(r.point_name):""} · ${esc(r.creator_name||"")}</div>
+              </div>
+              <span class="badge ${STATUS_BADGE[r.status]}">${STATUS_TEXT[r.status]}</span>
+            </div>
+            <div class="photo-grid" style="margin:10px 0" id="rv-photos-${r.id}"></div>
+            <div class="time-tag">上传于 ${fmtTime(r.created_at)}${r.reviewed_at?` · 审核于 ${fmtTime(r.reviewed_at)}`:""}</div>
+            ${r.status==='rejected'&&r.reject_reason?`<div style="color:var(--red);font-size:13px;margin-top:6px">驳回原因：${esc(r.reject_reason)}</div>`:""}
+            ${r.status==='pending'?`<div style="display:flex;gap:8px;margin-top:12px">
+              <button class="btn btn-primary" data-approve="${r.id}">通过</button>
+              <button class="btn btn-danger" data-reject="${r.id}">驳回</button>
+            </div>`:""}
+          </div>`).join("");
+        // 照片
+        for (const r of records.records) {
+          const box = $("#rv-photos-" + r.id); if (!box) continue;
+          const before = safeArr(r.photos_before), after = safeArr(r.photos_after);
+          const all = [...before.map(p=>({...p,tag:'前'})), ...after.map(p=>({...p,tag:'后'}))];
+          box.innerHTML = all.map(p=>`<div class="photo-box" data-key="${esc(p.key)}" data-tag="${p.tag}"><span>${p.tag}·加载中</span></div>`).join("");
+          for (const p of all) {
+            const div = box.querySelector(`[data-key="${p.key}"]`);
+            photoCache.get(p.key).then(url => { div.innerHTML = `<img src="${url}"><span style="position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,.5);padding:1px 6px;border-radius:4px;font-size:11px">${p.tag}</span>`; })
+              .catch(() => { div.innerHTML = `<span>${p.tag}·加载失败</span>`; });
+          }
+        }
+        $$("[data-approve]", el).forEach(b => b.onclick = () => rv.review(b.dataset.approve, "approve"));
+        $$("[data-reject]", el).forEach(b => b.onclick = () => rv.rejectModal(b.dataset.reject));
+      } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px;text-align:center">${esc(e.message)}</div>`; }
+    },
+    async review(id, action) {
+      try {
+        await api.post(`review/records/${id}/${action}`, {});
+        toast(action === "approve" ? "已通过" : "已驳回");
+        rv.loadList(state.rvTab === "pending" ? "pending" : "");
+      } catch (e) { toast(e.message); }
+    },
+    rejectModal(id) {
+      $("#app").insertAdjacentHTML("beforeend", `
+      <div class="modal-mask" id="reject-mask"><div class="modal">
+        <div class="modal-title">驳回原因</div>
+        <div class="form-group"><textarea class="input" id="reject-reason" placeholder="请填写驳回原因"></textarea></div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-danger" style="flex:1" id="reject-confirm">确认驳回</button>
+          <button class="btn" style="flex:1" id="reject-cancel">取消</button>
+        </div>
+      </div></div>`);
+      $("#reject-confirm").onclick = async () => {
+        const reason = $("#reject-reason").value.trim();
+        if (!reason) return toast("请填写驳回原因");
+        try { await api.post(`review/records/${id}/reject`, { reason }); $("#reject-mask").remove(); toast("已驳回"); rv.loadList(state.rvTab==="pending"?"pending":""); }
+        catch(e){ toast(e.message); }
+      };
+      $("#reject-cancel").onclick = () => $("#reject-mask").remove();
+    },
+  };
+  rv.render();
+}
+</script>
+</body>
+</html>
