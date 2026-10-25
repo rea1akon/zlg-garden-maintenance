@@ -13,7 +13,7 @@ pages_build_output_dir = "public"
 [[d1_databases]]
 binding = "DB"
 database_name = "zlg-garden-db"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "091da0ce-f083-44bb-8f24-f0e71aa066ae"
 
 # ---- R2 对象存储（照片）----
 # 部署时执行 `npx wrangler r2 bucket create zlg-garden-photos`。
