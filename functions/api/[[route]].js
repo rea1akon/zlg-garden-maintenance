@@ -283,10 +283,14 @@ async function login(request, env) {
 
 async function changePassword(request, env, user) {
   const { old_password, new_password } = await request.json().catch(() => ({}));
-  if (!old_password || !new_password) return fail("参数缺失", 400);
-  const cur = await env.DB.prepare("SELECT password_hash FROM users WHERE id = ?1").bind(user.id).first();
-  if (!(await verifyPassword(old_password, cur.password_hash))) return fail("旧密码错误", 400);
+  if (!new_password) return fail("参数缺失", 400);
   if (String(new_password).length < 6) return fail("新密码至少 6 位", 400);
+  const cur = await env.DB.prepare("SELECT password_hash, must_change_pwd FROM users WHERE id = ?1").bind(user.id).first();
+  // 首次登录强制改密（must_change_pwd=1）时，身份已验证，无需旧密码；否则需校验旧密码
+  if (!cur.must_change_pwd) {
+    if (!old_password) return fail("请填写旧密码", 400);
+    if (!(await verifyPassword(old_password, cur.password_hash))) return fail("旧密码错误", 400);
+  }
   const hash = await makePassword(new_password);
   await env.DB.prepare("UPDATE users SET password_hash = ?1, must_change_pwd = 0, updated_at = ?2 WHERE id = ?3")
     .bind(hash, now(), user.id).run();

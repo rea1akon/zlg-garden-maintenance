@@ -399,9 +399,9 @@ function renderChangePwd() {
     if (p1.length < 6) return toast("密码至少 6 位");
     if (p1 !== p2) return toast("两次密码不一致");
     try {
-      // 首次改密用旧密码校验，这里旧密码可能是初始密码；简化：直接调 change-password 需要旧密码，改用管理员重置场景
-      // 为支持"首次强制改密"，走后端专用逻辑：这里临时用 login 返回的账号，旧密码未知，故前端提示
-      toast("请通过管理员重置密码后重新登录"); 
+      await api.post("change-password", { new_password: p1 });
+      toast("密码修改成功，请重新登录");
+      logout();
     } catch (e) { toast(e.message); }
   };
   $("#chpwd-logout").onclick = () => { logout(); };
