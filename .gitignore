@@ -8,3 +8,6 @@ node_modules/
 # 交接文档（含账号/密钥信息，不入库）
 交接*.md
 _screenshot*.png
+
+# 版本号文件由 scripts/gen-version.mjs 在部署时生成
+public/version.json
