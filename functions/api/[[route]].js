@@ -628,20 +628,32 @@ async function uploadPhoto(request, env, user) {
 async function reviewRoute(path, method, request, env, user) {
   const url = new URL(request.url);
 
-  // 待审核列表
+  // 审核记录列表：status 缺省/为空/all 表示全部状态；另支持 date/from/to/office
   if (path === "review/records" && method === "GET") {
-    const status = url.searchParams.get("status") || "pending";
+    const status = url.searchParams.get("status") || "";
     const date = url.searchParams.get("date");
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    const office = url.searchParams.get("office");
     const filter = scopeOfficeFilter(user, "r.");
-    let sql = `SELECT r.*, o.name AS office_name, COALESCE(NULLIF(r.point_text,''), p.name) AS point_name, u.display_name AS creator_name
-               FROM daily_records r
-               LEFT JOIN offices o ON o.id = r.office_id
-               LEFT JOIN points p ON p.id = r.point_id
-               LEFT JOIN users u ON u.id = r.created_by
-               WHERE ${filter.where} AND r.status = ?${filter.params.length + 1}`;
-    const params = [...filter.params, status];
-    if (date) { sql += " AND r.work_date = ?" + (params.length + 1); params.push(date); }
-    sql += " ORDER BY r.created_at DESC LIMIT 500";
+    const where = [filter.where];
+    const params = [...filter.params];
+    if (status && status !== "all") { params.push(status); where.push("r.status = ?" + params.length); }
+    if (date) { params.push(date); where.push("r.work_date = ?" + params.length); }
+    if (from) { params.push(from); where.push("r.work_date >= ?" + params.length); }
+    if (to) { params.push(to); where.push("r.work_date <= ?" + params.length); }
+    if (office) { params.push(office); where.push("r.office_id = ?" + params.length); }
+    const sql = `SELECT r.*, reg.name AS region_name, o.name AS office_name,
+                        COALESCE(NULLIF(r.point_text,''), p.name) AS point_name,
+                        u.display_name AS creator_name, rv.display_name AS reviewer_name
+                   FROM daily_records r
+                   LEFT JOIN offices o ON o.id = r.office_id
+                   LEFT JOIN regions reg ON reg.id = o.region_id
+                   LEFT JOIN points p ON p.id = r.point_id
+                   LEFT JOIN users u ON u.id = r.created_by
+                   LEFT JOIN users rv ON rv.id = r.reviewed_by
+                  WHERE ${where.join(" AND ")}
+                  ORDER BY r.created_at DESC LIMIT 500`;
     const rows = await env.DB.prepare(sql).bind(...params).all();
     return json({ ok: true, records: rows.results });
   }
