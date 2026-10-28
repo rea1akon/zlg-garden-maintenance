@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS daily_records (
   id            TEXT PRIMARY KEY,
   office_id     TEXT NOT NULL REFERENCES offices(id),
   point_id      TEXT REFERENCES points(id),   -- 可选
+  point_text    TEXT,                         -- 养护点"其他"手填名称（填了则不关联 points）
   work_date     TEXT NOT NULL,                -- 'YYYY-MM-DD' 东八区本地日期
   care_type_id  TEXT REFERENCES care_types(id),
   care_name     TEXT,                         -- 快照：养护内容名（其他内容时存自定义文字）

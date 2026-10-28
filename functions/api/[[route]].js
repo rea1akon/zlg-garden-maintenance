@@ -456,22 +456,25 @@ async function unitRoute(path, method, request, env, user) {
   const url = new URL(request.url);
 
   // 养护内容字典（读）
+  // 与后台「养护内容字典」保持一致：始终返回全部启用的字典项；
+  // 本所预设过的项打 preset 标记并排在前面，方便填报时先看到常用项。
   if (path === "care-types" && method === "GET") {
-    // 返回本所预设的内容（unit/reviewer）；admin 看全部
-    let rows;
-    if (isAdmin(user)) {
-      rows = await env.DB.prepare("SELECT * FROM care_types WHERE enabled=1 ORDER BY sort_order, name").all();
-    } else if (user.scope_id) {
-      rows = await env.DB.prepare(
-        `SELECT ct.* FROM care_types ct
-         JOIN office_care_types oct ON oct.care_type_id = ct.id
-         WHERE oct.office_id = ?1 AND ct.enabled = 1
-         ORDER BY ct.sort_order, ct.name`
+    const all = await env.DB.prepare(
+      "SELECT * FROM care_types WHERE enabled=1 ORDER BY sort_order, name"
+    ).all();
+    let rows = all.results || [];
+    let presetIds = new Set();
+    if (!isAdmin(user) && user.scope_id) {
+      const preset = await env.DB.prepare(
+        "SELECT care_type_id FROM office_care_types WHERE office_id=?1"
       ).bind(user.scope_id).all();
-    } else {
-      rows = await env.DB.prepare("SELECT * FROM care_types WHERE enabled=1 ORDER BY sort_order, name").all();
+      presetIds = new Set((preset.results || []).map(x => x.care_type_id));
     }
-    return json({ ok: true, careTypes: rows.results });
+    if (presetIds.size) {
+      rows = rows.map(r => ({ ...r, preset: presetIds.has(r.id) ? 1 : 0 }));
+      rows.sort((a, b) => b.preset - a.preset); // 稳定排序：本所预设优先，其余保持字典顺序
+    }
+    return json({ ok: true, careTypes: rows, presetCount: presetIds.size });
   }
 
   // 养护点（读，本范围）
@@ -497,7 +500,7 @@ async function unitRoute(path, method, request, env, user) {
     const date = url.searchParams.get("date");
     const pointId = url.searchParams.get("point_id");
     const filter = scopeOfficeFilter(user, "r.");
-    let sql = `SELECT r.*, o.name AS office_name, p.name AS point_name
+    let sql = `SELECT r.*, o.name AS office_name, COALESCE(NULLIF(r.point_text,''), p.name) AS point_name
                FROM daily_records r
                LEFT JOIN offices o ON o.id = r.office_id
                LEFT JOIN points p ON p.id = r.point_id
@@ -531,7 +534,7 @@ async function unitRoute(path, method, request, env, user) {
 async function saveRecord(request, env, user, recordId) {
   const body = await request.json().catch(() => ({}));
   const {
-    office_id, point_id, work_date, care_type_id, care_name, quantity, unit,
+    office_id, point_id, point_text, work_date, care_type_id, care_name, quantity, unit,
     description, photos_before, photos_after,
   } = body;
 
@@ -542,6 +545,9 @@ async function saveRecord(request, env, user, recordId) {
   if (!office_id) return fail("缺少养护所", 400);
   if (!work_date) return fail("缺少作业日期", 400);
   if (!care_type_id && !care_name) return fail("请选择或填写养护内容", 400);
+  // 养护点"其他"：手填的名称优先，此时不关联 points 表
+  const pointText = String(point_text || "").trim().slice(0, 80) || null;
+  const pointId = pointText ? null : (point_id || null);
 
   const pb = JSON.stringify(photos_before || []);
   const pa = JSON.stringify(photos_after || []);
@@ -553,20 +559,20 @@ async function saveRecord(request, env, user, recordId) {
     if (!(await officeInScope(env, user, existing.office_id))) return fail("无权限", 403);
     if (existing.status === "approved") return fail("已审核通过的记录不可修改", 400);
     await env.DB.prepare(
-      `UPDATE daily_records SET office_id=?1, point_id=?2, care_type_id=?3, care_name=?4, quantity=?5,
-        unit=?6, description=?7, photos_before=?8, photos_after=?9, status='pending', reject_reason=NULL,
-        updated_at=?10 WHERE id=?11`
-    ).bind(office_id, point_id || null, care_type_id || null, care_name || null, quantity || null,
+      `UPDATE daily_records SET office_id=?1, point_id=?2, point_text=?3, care_type_id=?4, care_name=?5,
+        quantity=?6, unit=?7, description=?8, photos_before=?9, photos_after=?10, status='pending',
+        reject_reason=NULL, updated_at=?11 WHERE id=?12`
+    ).bind(office_id, pointId, pointText, care_type_id || null, care_name || null, quantity || null,
       unit || null, description || null, pb, pa, now(), recordId).run();
     return json({ ok: true, id: recordId });
   }
 
   const id = crypto.randomUUID();
   await env.DB.prepare(
-    `INSERT INTO daily_records (id, office_id, point_id, work_date, care_type_id, care_name, quantity,
+    `INSERT INTO daily_records (id, office_id, point_id, point_text, work_date, care_type_id, care_name, quantity,
       unit, description, photos_before, photos_after, status, created_by, created_at, updated_at)
-     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,'pending',?12,?13,?13)`
-  ).bind(id, office_id, point_id || null, work_date, care_type_id || null, care_name || null,
+     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,'pending',?13,?14,?14)`
+  ).bind(id, office_id, pointId, pointText, work_date, care_type_id || null, care_name || null,
     quantity || null, unit || null, description || null, pb, pa, user.id, now()).run();
   return json({ ok: true, id });
 }
@@ -624,7 +630,7 @@ async function reviewRoute(path, method, request, env, user) {
     const status = url.searchParams.get("status") || "pending";
     const date = url.searchParams.get("date");
     const filter = scopeOfficeFilter(user, "r.");
-    let sql = `SELECT r.*, o.name AS office_name, p.name AS point_name, u.display_name AS creator_name
+    let sql = `SELECT r.*, o.name AS office_name, COALESCE(NULLIF(r.point_text,''), p.name) AS point_name, u.display_name AS creator_name
                FROM daily_records r
                LEFT JOIN offices o ON o.id = r.office_id
                LEFT JOIN points p ON p.id = r.point_id
@@ -924,7 +930,8 @@ async function exportCsv(env, url) {
   const to = url.searchParams.get("to");
   const officeId = url.searchParams.get("office");
 
-  let sql = `SELECT r.work_date, reg.name AS region_name, o.name AS office_name, p.name AS point_name,
+  let sql = `SELECT r.work_date, reg.name AS region_name, o.name AS office_name,
+             COALESCE(NULLIF(r.point_text,''), p.name) AS point_name,
              r.care_name, r.quantity, r.unit, r.description, r.status, r.reject_reason,
              u.display_name AS creator, r.created_at, rv.display_name AS reviewer, r.reviewed_at
              FROM daily_records r

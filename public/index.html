@@ -550,7 +550,7 @@ function renderUnit() {
         <button class="btn btn-sm" id="back-btn">返回</button>
       </div>
       <div class="card" style="max-width:640px">
-        <div class="form-group"><label>养护内容 <span style="color:var(--text3)">（搜索选择，或选"其他"自填）</span></label>
+        <div class="form-group"><label>养护内容 <span style="color:var(--text3)">（字典共 ${(unit._careTypes||[]).length} 项，可搜索；无匹配时选「其他内容」自填）</span></label>
           <div class="search-dropdown">
             <input class="input" id="care-search" placeholder="输入关键词搜索养护内容…" autocomplete="off">
             <div class="dropdown-panel hidden" id="care-dropdown"></div>
@@ -560,9 +560,13 @@ function renderUnit() {
           <div class="form-group"><label>数量</label><input class="input" id="care-qty" type="number" step="any" placeholder="0"></div>
           <div class="form-group"><label>单位</label><input class="input" id="care-unit" readonly placeholder="—"></div>
         </div>
-        <div class="form-group"><label>养护点（可选）</label><select class="input" id="care-point"><option value="">不指定养护点</option>
-          ${(unit._points||[]).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}
-        </select></div>
+        <div class="form-group"><label>养护点</label>
+          <div class="search-dropdown">
+            <input class="input" id="point-search" placeholder="下拉选择" autocomplete="off">
+            <div class="dropdown-panel hidden" id="point-dropdown"></div>
+          </div>
+          <div style="color:var(--text3);font-size:12px;margin-top:6px">可输入关键词筛选；列表里没有的养护点，输入名称后会自动按「其他」保存</div>
+        </div>
         <div class="form-group"><label>备注</label><textarea class="input" id="care-desc" placeholder="补充说明（可选）"></textarea></div>
         <div class="form-group"><label>作业前照片</label><div class="photo-grid" id="before-grid"><div class="photo-box" id="before-add">+ 拍照/选图</div></div></div>
         <div class="form-group"><label>作业后照片</label><div class="photo-grid" id="after-grid"><div class="photo-box" id="after-add">+ 拍照/选图</div></div></div>
@@ -575,29 +579,121 @@ function renderUnit() {
         quantity: record?.quantity ?? null, desc: record?.description || "",
       };
       $("#back-btn").onclick = () => unit.render();
-      // 养护内容搜索下拉
-      const search = $("#care-search"); const dropdown = $("#care-dropdown");
+      // 养护内容搜索下拉（对应后台「养护内容字典」，支持关键词搜索 + 键盘上下选择）
+      const search = $("#care-search"), dropdown = $("#care-dropdown"), unitInput = $("#care-unit");
+      let activeIdx = -1;
+      const hl = (name, kw) => {
+        if (!kw) return esc(name);
+        const i = name.indexOf(kw);
+        if (i < 0) return esc(name);
+        return esc(name.slice(0,i)) + `<b style="color:var(--green3)">${esc(kw)}</b>` + esc(name.slice(i+kw.length));
+      };
+      function renderCareList(kw) {
+        const list = (unit._careTypes||[]).filter(c => !kw || c.name.includes(kw));
+        const head = kw ? `<div class="dropdown-item" style="cursor:default;color:var(--text3);font-size:12px">匹配 ${list.length} 项</div>` : "";
+        const items = list.map(c=>`<div class="dropdown-item" data-id="${c.id}" data-name="${esc(c.name)}" data-unit="${esc(c.unit)}"><span>${hl(c.name,kw)}${c.preset?`<span style="margin-left:6px;font-size:11px;color:var(--green3);border:1px solid var(--green3);border-radius:4px;padding:0 4px">本所</span>`:""}</span><span class="unit">${esc(c.unit)}</span></div>`).join("");
+        dropdown.innerHTML = head + items
+          + `<div class="dropdown-item" data-id="__other" style="position:sticky;bottom:0;background:var(--card2);border-top:1px solid var(--border2)"><span>＋ 其他内容（自填）</span><span class="unit">手动填写名称与单位</span></div>`;
+        dropdown.classList.remove("hidden");
+        $("#point-dropdown").classList.add("hidden"); // 两个下拉互斥，避免叠在一起
+        activeIdx = -1;
+        $$(".dropdown-item", dropdown).forEach(it => { if (it.dataset.id) it.onclick = () => pickCare(it); });
+      }
+      function pickCare(it) {
+        const other = it.dataset.id === "__other";
+        unit._form.careTypeId = other ? "" : it.dataset.id;
+        unit._form.careTypeUnit = it.dataset.unit || "";
+        if (other) {
+          search.value = ""; search.placeholder = "请输入养护内容名称"; search.focus();
+          unitInput.removeAttribute("readonly"); unitInput.placeholder = "如：株 / ㎡ / 吨";
+        } else {
+          search.value = it.dataset.name;
+          unitInput.value = it.dataset.unit || "";
+          unitInput.setAttribute("readonly", "");
+        }
+        dropdown.classList.add("hidden");
+      }
       if (isEdit && unit._form.careTypeId) {
         const ct = (unit._careTypes||[]).find(c=>c.id===unit._form.careTypeId);
-        if (ct) { search.value = ct.name; $("#care-unit").value = ct.unit; unit._form.careName = ct.name; }
-      } else if (isEdit && unit._form.careName) { search.value = unit._form.careName; $("#care-unit").value = unit._form.careTypeUnit||""; }
-      function filterCare(kw) {
-        const list = (unit._careTypes||[]).filter(c => !kw || c.name.includes(kw));
-        dropdown.innerHTML = list.map(c=>`<div class="dropdown-item" data-id="${c.id}" data-name="${esc(c.name)}" data-unit="${esc(c.unit)}"><span>${esc(c.name)}</span><span class="unit">${esc(c.unit)}</span></div>`).join("")
-          + `<div class="dropdown-item" data-id="__other" data-name="其他内容" data-unit=""><span>其他内容（自填）</span><span class="unit"></span></div>`;
-        dropdown.classList.toggle("hidden", false);
-        $$(".dropdown-item", dropdown).forEach(it => it.onclick = () => {
-          unit._form.careTypeId = it.dataset.id === "__other" ? "" : it.dataset.id;
-          unit._form.careTypeUnit = it.dataset.unit;
-          if (it.dataset.id === "__other") { search.value = ""; search.placeholder = "请输入养护内容名称"; search.focus(); }
-          else { search.value = it.dataset.name; }
-          $("#care-unit").value = it.dataset.unit;
-          dropdown.classList.add("hidden");
-        });
+        if (ct) { search.value = ct.name; unitInput.value = ct.unit; unit._form.careName = ct.name; }
+      } else if (isEdit && unit._form.careName) {
+        search.value = unit._form.careName; unitInput.value = unit._form.careTypeUnit||"";
+        unitInput.removeAttribute("readonly"); // 历史自填内容，允许改单位
       }
-      search.oninput = () => filterCare(search.value.trim());
-      search.onfocus = () => filterCare(search.value.trim());
-      document.addEventListener("click", function close(e){ if(!e.target.closest(".search-dropdown")) dropdown.classList.add("hidden"); });
+      search.oninput = () => { unit._form.careTypeId = ""; unit._form.careName = search.value.trim(); renderCareList(search.value.trim()); };
+      search.onfocus = () => renderCareList(unit._form.careTypeId ? "" : search.value.trim());
+      search.onkeydown = (e) => {
+        const items = $$(".dropdown-item[data-id]", dropdown);
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          if (dropdown.classList.contains("hidden")) return renderCareList(search.value.trim());
+          if (!items.length) return;
+          activeIdx = e.key === "ArrowDown" ? Math.min(activeIdx + 1, items.length - 1) : Math.max(activeIdx - 1, 0);
+          items.forEach((it, i) => it.style.background = i === activeIdx ? "var(--card)" : "");
+          items[activeIdx].scrollIntoView({ block: "nearest" });
+        } else if (e.key === "Enter") {
+          if (activeIdx >= 0 && !dropdown.classList.contains("hidden")) { e.preventDefault(); pickCare(items[activeIdx]); }
+        } else if (e.key === "Escape") { dropdown.classList.add("hidden"); }
+      };
+      // 点击空白处关闭两个下拉（重复打开表单时只保留一个监听，避免累积）
+      if (unit._closeDrops) document.removeEventListener("click", unit._closeDrops);
+      unit._closeDrops = function (e) {
+        if (!e.target.closest(".search-dropdown")) { dropdown.classList.add("hidden"); $("#point-dropdown").classList.add("hidden"); }
+      };
+      document.addEventListener("click", unit._closeDrops);
+
+      // 养护点：可搜索下拉；列表外名称直接输入 → 按「其他」保存
+      const pointInput = $("#point-search"), pointDropdown = $("#point-dropdown");
+      const P_MAX = 60;
+      let pActive = -1;
+      function renderPointList(kw) {
+        const list = (unit._points || []).filter(p => !kw || p.name.includes(kw));
+        const head = `<div class="dropdown-item" style="cursor:default;color:var(--text3);font-size:12px">${kw ? `匹配 ${list.length} 项` : `共 ${list.length} 个养护点`}</div>`;
+        const items = list.slice(0, P_MAX).map(p =>
+          `<div class="dropdown-item" data-pid="${p.id}" data-name="${esc(p.name)}"><span>${hl(p.name, kw)}</span></div>`
+        ).join("");
+        const more = list.length > P_MAX
+          ? `<div class="dropdown-item" style="cursor:default;color:var(--text3);font-size:12px">还有 ${list.length - P_MAX} 项，继续输入关键词缩小范围</div>`
+          : "";
+        pointDropdown.innerHTML = head + items + more
+          + `<div class="dropdown-item" data-pid="__other" style="position:sticky;bottom:0;background:var(--card2);border-top:1px solid var(--border2)"><span>＋ 其他（手动填写）</span><span class="unit">手动填写名称</span></div>`;
+        pointDropdown.classList.remove("hidden");
+        $("#care-dropdown").classList.add("hidden"); // 两个下拉互斥，避免叠在一起
+        pActive = -1;
+        $$(".dropdown-item[data-pid]", pointDropdown).forEach(it => it.onclick = () => pickPoint(it));
+      }
+      function pickPoint(it) {
+        if (it.dataset.pid === "__other") {
+          unit._form.pointId = "";
+          pointInput.value = "";
+          pointInput.placeholder = "请输入养护点名称";
+          pointInput.focus();
+        } else {
+          unit._form.pointId = it.dataset.pid;
+          pointInput.value = it.dataset.name;
+        }
+        pointDropdown.classList.add("hidden");
+      }
+      if (isEdit && record) {
+        if (record.point_id) { unit._form.pointId = record.point_id; pointInput.value = record.point_name || ""; }
+        else if (record.point_text) { unit._form.pointId = ""; pointInput.value = record.point_text; }
+      }
+      pointInput.oninput = () => { unit._form.pointId = ""; renderPointList(pointInput.value.trim()); };
+      pointInput.onfocus = () => renderPointList(unit._form.pointId ? "" : pointInput.value.trim());
+      pointInput.onkeydown = (e) => {
+        const items = $$(".dropdown-item[data-pid]", pointDropdown);
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          if (pointDropdown.classList.contains("hidden")) return renderPointList(pointInput.value.trim());
+          if (!items.length) return;
+          pActive = e.key === "ArrowDown" ? Math.min(pActive + 1, items.length - 1) : Math.max(pActive - 1, 0);
+          items.forEach((it, i) => it.style.background = i === pActive ? "var(--card)" : "");
+          items[pActive].scrollIntoView({ block: "nearest" });
+        } else if (e.key === "Enter") {
+          if (pActive >= 0 && !pointDropdown.classList.contains("hidden")) { e.preventDefault(); pickPoint(items[pActive]); }
+        } else if (e.key === "Escape") { pointDropdown.classList.add("hidden"); }
+      };
+
       // 照片上传
       setupPhotoUpload("before", unit._form);
       setupPhotoUpload("after", unit._form);
@@ -610,9 +706,12 @@ function renderUnit() {
       const qty = $("#care-qty").value === "" ? null : parseFloat($("#care-qty").value);
       if (!careTypeId && !careName) return toast("请选择或填写养护内容");
       if (!f.before.length && !f.after.length) return toast("请至少上传一张作业照片");
+      const pointId = f.pointId || null;
+      const pointText = pointId ? null : ($("#point-search").value.trim() || null);
       const body = {
         office_id: state.user.scope_id,
-        point_id: $("#care-point").value || null,
+        point_id: pointId,
+        point_text: pointText,
         work_date: today(),
         care_type_id: careTypeId || null,
         care_name: careName || null,
@@ -665,7 +764,7 @@ async function setupPhotoUpload(tag, formState) {
           fd.append("cat", tag);
           const data = await api.post("photos/upload", fd);
           formState[tag].push(data.key);
-          renderPhotoThumb(grid, addBtn, data.key, tag);
+          renderPhotoThumb(grid, addBtn, data.key, tag, formState);
         } catch (e) { toast("上传失败: " + e.message); }
         addBtn.innerHTML = "+ 拍照/选图";
       }
@@ -673,21 +772,24 @@ async function setupPhotoUpload(tag, formState) {
     input.click();
   };
   // 初始渲染已有照片
-  for (const key of formState[tag]) renderPhotoThumb(grid, addBtn, key, tag);
+  for (const key of formState[tag]) renderPhotoThumb(grid, addBtn, key, tag, formState);
 }
 
-function renderPhotoThumb(grid, addBtn, key, tag) {
+function renderPhotoThumb(grid, addBtn, key, tag, formState) {
   const div = document.createElement("div");
   div.className = "photo-box"; div.dataset.key = key;
-  div.innerHTML = `<span>加载中</span><button class="del">×</button>`;
+  div.innerHTML = `<span>加载中</span><button type="button" class="del">×</button>`;
   grid.insertBefore(div, addBtn);
-  photoCache.get(key).then(url => { div.innerHTML = `<img src="${url}"><button class="del">×</button>`; })
-    .catch(() => { div.innerHTML = `<span>加载失败</span><button class="del">×</button>`; });
-  div.querySelector(".del").onclick = (e) => {
-    e.stopPropagation();
-    const idx = formState[tag].indexOf(key); if (idx >= 0) formState[tag].splice(idx, 1);
+  // 删除按钮走容器事件委托：图片加载完成后 innerHTML 会重绘，直接绑在按钮上会丢
+  div.onclick = (e) => {
+    if (!e.target.closest(".del")) return;
+    e.preventDefault(); e.stopPropagation();
+    const idx = formState[tag].indexOf(key);
+    if (idx >= 0) formState[tag].splice(idx, 1);
     div.remove();
   };
+  photoCache.get(key).then(url => { div.innerHTML = `<img src="${url}"><button type="button" class="del">×</button>`; })
+    .catch(() => { div.innerHTML = `<span>加载失败</span><button type="button" class="del">×</button>`; });
 }
 
 // 客户端图片压缩
