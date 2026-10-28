@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "wrangler pages dev public",
     "db:local": "wrangler d1 execute zlg-garden-db --local --file=./schema.sql",
-    "deploy": "wrangler pages deploy"
+    "version:gen": "node scripts/gen-version.mjs",
+    "predeploy": "node scripts/gen-version.mjs",
+    "deploy": "wrangler pages deploy public --project-name zlg-garden-maintenance --branch main --commit-dirty=true"
   },
   "devDependencies": {
     "wrangler": "^4.152.0"
