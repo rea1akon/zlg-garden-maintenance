@@ -7,6 +7,7 @@
     "dev": "wrangler pages dev public",
     "db:local": "wrangler d1 execute zlg-garden-db --local --file=./schema.sql",
     "version:gen": "node scripts/gen-version.mjs",
+    "push": "node scripts/git-push.mjs",
     "predeploy": "node scripts/gen-version.mjs",
     "deploy": "wrangler pages deploy public --project-name zlg-garden-maintenance --branch main --commit-dirty=true"
   },
