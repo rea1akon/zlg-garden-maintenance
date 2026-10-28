@@ -169,11 +169,11 @@ function isReviewer(user) { return user && user.role === "reviewer"; }
 function scopeOfficeFilter(user, prefix = "") {
   const col = prefix + "office_id";
   if (isAdmin(user)) return { where: "1=1", params: [] };
-  if (user.scope_type === "office" && user.scope_id) {
-    return { where: col + " = ?", params: [user.scope_id] };
-  }
-  // 默认收紧到自己范围
-  return { where: col + " = ?", params: [user.scope_id || ""] };
+  // scope_type=all：全局范围（考核员看全部、管理员口径），不按养护所收紧
+  if (user.scope_type === "all") return { where: "1=1", params: [] };
+  if (user.scope_id) return { where: col + " = ?", params: [user.scope_id] };
+  // scope_type=office 但没绑定具体养护所：没有任何可见范围，返回空集（而不是误匹配 office_id=''）
+  return { where: "1=0", params: [] };
 }
 
 function scopeOfficeId(user) {
@@ -184,6 +184,7 @@ function scopeOfficeId(user) {
 // 判断某 office 是否在用户范围内
 async function officeInScope(env, user, officeId) {
   if (isAdmin(user)) return true;
+  if (user.scope_type === "all") return true; // 全局范围账号可覆盖所有养护所
   return officeId === user.scope_id;
 }
 
@@ -439,14 +440,16 @@ async function photoAllowed(env, user, key) {
   // 注意：D1 中匿名 ? 与命名 ?1 不可混用；这里统一用命名序号占位符，
   // scope_id 占 ?1，key 占 ?2，避免 "Wrong number of parameter bindings"。
   const filter = scopeOfficeFilter(user);
-  const scopeParam = filter.params.length ? filter.params[0] : null;
-  const row = await env.DB.prepare(
+  const scoped = filter.params.length > 0;
+  const sql =
     `SELECT 1 AS x FROM daily_records
-      WHERE office_id = ?1
-        AND (EXISTS (SELECT 1 FROM json_each(daily_records.photos_before) AS a WHERE json_extract(a.value,'$.key') = ?2)
-          OR EXISTS (SELECT 1 FROM json_each(daily_records.photos_after)  AS b WHERE json_extract(b.value,'$.key') = ?2))
-      LIMIT 1`
-  ).bind(scopeParam, key).first();
+      WHERE ${scoped ? "office_id = ?1 AND " : ""}
+        (EXISTS (SELECT 1 FROM json_each(daily_records.photos_before) AS a WHERE json_extract(a.value,'$.key') = ?${scoped ? 2 : 1})
+      OR EXISTS (SELECT 1 FROM json_each(daily_records.photos_after)  AS b WHERE json_extract(b.value,'$.key') = ?${scoped ? 2 : 1}))
+      LIMIT 1`;
+  const row = scoped
+    ? await env.DB.prepare(sql).bind(filter.params[0], key).first()
+    : await env.DB.prepare(sql).bind(key).first();
   return !!row;
 }
 
