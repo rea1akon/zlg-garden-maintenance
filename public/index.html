@@ -461,6 +461,33 @@ function logout() {
   localStorage.removeItem(TOKEN_KEY); photoCache.clear(); render();
 }
 
+// ============ 修改密码（考核员 / 养护单位侧边栏共用）============
+function renderPasswordPanel() {
+  $(".main").innerHTML = `
+  <div style="font-size:18px;font-weight:600;margin-bottom:16px">修改密码</div>
+  <div class="card" style="max-width:460px">
+    <div class="form-group"><label>当前账号</label><input class="input" value="${esc(state.user?.username || "")}" readonly></div>
+    <div class="form-group"><label>原密码</label><input class="input" type="password" id="pw-old" placeholder="请输入当前密码" autocomplete="current-password"></div>
+    <div class="form-group"><label>新密码</label><input class="input" type="password" id="pw-new" placeholder="至少 6 位" autocomplete="new-password"></div>
+    <div class="form-group"><label>确认新密码</label><input class="input" type="password" id="pw-new2" placeholder="再次输入新密码" autocomplete="new-password"></div>
+    <button class="btn btn-primary btn-block" id="pw-save">确认修改</button>
+    <div style="color:var(--text3);font-size:12px;margin-top:10px">修改成功后当前登录会失效，需要用新密码重新登录</div>
+  </div>`;
+  $("#pw-save").onclick = async () => {
+    const oldP = $("#pw-old").value, p1 = $("#pw-new").value, p2 = $("#pw-new2").value;
+    if (!oldP) return toast("请输入原密码");
+    if (p1.length < 6) return toast("新密码至少 6 位");
+    if (p1 !== p2) return toast("两次输入的新密码不一致");
+    if (p1 === oldP) return toast("新密码不能与原密码相同");
+    try {
+      await api.post("change-password", { old_password: oldP, new_password: p1 });
+      toast("密码已修改，请重新登录");
+      setTimeout(() => logout(), 900);
+    } catch (e) { toast(e.message); }
+  };
+  $("#pw-new2").onkeydown = e => { if (e.key === "Enter") $("#pw-save").click(); };
+}
+
 // ============ 布局骨架 ============
 function layout(navItems, activeKey, contentHTML) {
   const navHtml = navItems.map(n => `
@@ -497,10 +524,12 @@ function renderUnit() {
       const navItems = [
         { key: "report", label: "今日上报" },
         { key: "history", label: "历史记录" },
+        { key: "password", label: "修改密码" },
       ];
       $("#app").innerHTML = layout(navItems, state.unitTab, "");
       bindNavAndLogout(unit);
       if (state.unitTab === "report") unit.renderReport();
+      else if (state.unitTab === "password") renderPasswordPanel();
       else unit.renderHistory();
     },
     async renderReport() {
@@ -1445,9 +1474,11 @@ function renderReviewer() {
       const navItems = [
         { key: "pending", label: "待审核" },
         { key: "all", label: "全部记录" },
+        { key: "password", label: "修改密码" },
       ];
       $("#app").innerHTML = layout(navItems, state.rvTab, "");
       bindNavAndLogout(rv);
+      if (state.rvTab === "password") { renderPasswordPanel(); return; }
       rv.loadList();
     },
     async loadList() {
