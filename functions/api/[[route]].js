@@ -503,9 +503,11 @@ async function unitRoute(path, method, request, env, user) {
     const date = url.searchParams.get("date");
     const pointId = url.searchParams.get("point_id");
     const filter = scopeOfficeFilter(user, "r.");
-    let sql = `SELECT r.*, o.name AS office_name, COALESCE(NULLIF(r.point_text,''), p.name) AS point_name
+    let sql = `SELECT r.*, reg.name AS region_name, o.name AS office_name,
+                      COALESCE(NULLIF(r.point_text,''), p.name) AS point_name
                FROM daily_records r
                LEFT JOIN offices o ON o.id = r.office_id
+               LEFT JOIN regions reg ON reg.id = o.region_id
                LEFT JOIN points p ON p.id = r.point_id
                WHERE ${filter.where}`;
     const params = [...filter.params];

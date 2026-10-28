@@ -178,6 +178,17 @@ tr:hover td { background: rgba(34, 197, 94, 0.03); }
 }
 .photo-box img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .photo-box .del { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; border: none; cursor: pointer; font-size: 14px; z-index: 2; }
+.photo-box img { cursor: zoom-in; }
+
+/* 照片查看器（点击缩略图放大） */
+.img-viewer {
+  position: fixed; inset: 0; z-index: 200; background: rgba(0, 0, 0, .88);
+  display: flex; align-items: center; justify-content: center; padding: 24px; cursor: zoom-out;
+}
+.img-viewer img { max-width: 94vw; max-height: 88vh; border-radius: 8px; box-shadow: 0 12px 48px rgba(0, 0, 0, .7); }
+.img-viewer-cap { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; color: rgba(255,255,255,.75); font-size: 13px; }
+.img-viewer-close { position: absolute; top: 10px; right: 16px; color: #fff; font-size: 30px; line-height: 1; opacity: .75; }
+.img-viewer-close:hover { opacity: 1; }
 
 /* 搜索下拉 */
 .search-dropdown { position: relative; }
@@ -488,6 +499,34 @@ function renderPasswordPanel() {
   $("#pw-new2").onkeydown = e => { if (e.key === "Enter") $("#pw-save").click(); };
 }
 
+// ============ 照片查看器（所有模块统一：点缩略图放大）============
+async function openPhotoViewer(key, caption) {
+  let url;
+  try { url = await photoCache.get(key); } catch (e) { return toast("照片加载失败"); }
+  $("#app").insertAdjacentHTML("beforeend", `
+  <div class="img-viewer" id="img-viewer">
+    <img src="${url}" alt="">
+    <div class="img-viewer-cap">${esc(caption || "")}</div>
+    <div class="img-viewer-close">×</div>
+  </div>`);
+  const viewer = $("#img-viewer");
+  const close = () => { viewer.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = e => { if (e.key === "Escape") close(); };
+  viewer.onclick = close;
+  document.addEventListener("keydown", onKey);
+}
+
+// 给容器内所有缩略图挂上“点击放大”
+function attachPhotoZoom(root) {
+  $$(".photo-box", root || document).forEach(box => {
+    const key = box.dataset.key || box.dataset.k || box.dataset.dk;
+    if (!key || box.querySelector(".del")) return; // 表单里带删除按钮的不处理
+    box.style.cursor = "zoom-in";
+    box.title = box.title || "点击查看大图";
+    box.onclick = (e) => { e.stopPropagation(); openPhotoViewer(key, box.title === "点击查看大图" ? "" : box.title); };
+  });
+}
+
 // ============ 布局骨架 ============
 function layout(navItems, activeKey, contentHTML) {
   const navHtml = navItems.map(n => `
@@ -561,42 +600,50 @@ function renderUnit() {
         unit.renderRecordList(todayRecords.records);
       } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px;text-align:center">${esc(e.message)}</div>`; }
     },
-    renderRecordList(records) {
+    renderRecordList(records, emptyText) {
       const el = $("#unit-record-list");
       if (!el) return;
-      if (!records.length) { el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3)">今日暂无上报记录</div>`; return; }
-      el.innerHTML = records.map(r => `
-        <div class="card" style="margin-bottom:12px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-            <div>
-              <span style="font-weight:600;font-size:15px">${esc(r.care_name||"未命名养护")}</span>
-              ${r.quantity!=null?`<span style="color:var(--text2);margin-left:8px">${r.quantity} ${esc(r.unit||"")}</span>`:""}
-            </div>
-            <span class="badge ${STATUS_BADGE[r.status]}">${STATUS_TEXT[r.status]}</span>
-          </div>
-          ${r.point_name?`<div class="time-tag">养护点：${esc(r.point_name)}</div>`:""}
-          <div class="photo-grid" style="margin:10px 0" id="rec-photos-${r.id}"></div>
-          <div class="time-tag">上传于 ${fmtTime(r.created_at)}${r.reviewed_at?` · 审核于 ${fmtTime(r.reviewed_at)}`:""}</div>
-          ${r.status==='rejected'&&r.reject_reason?`<div style="color:var(--red);font-size:13px;margin-top:6px">驳回原因：${esc(r.reject_reason)}</div>`:""}
-          ${r.status!=='approved'?`<div style="display:flex;gap:8px;margin-top:10px">
-            <button class="btn btn-sm" data-edit="${r.id}">编辑重报</button>
-            <button class="btn btn-sm btn-danger" data-del="${r.id}">删除</button>
-          </div>`:""}
-        </div>`).join("");
-      // 渲染照片
-      for (const r of records) {
-        const box = $("#rec-photos-" + r.id);
-        if (!box) continue;
-        const before = safeArr(r.photos_before), after = safeArr(r.photos_after);
-        const all = [...before.map(p=>({...p,tag:'前'})), ...after.map(p=>({...p,tag:'后'}))];
-        box.innerHTML = all.map(p => `<div class="photo-box" data-key="${esc(p.key)}" data-tag="${p.tag}"><span>${p.tag}·加载中</span></div>`).join("");
-        for (const p of all) {
-          const div = box.querySelector(`[data-key="${p.key}"]`);
-          photoCache.get(p.key).then(url => {
-            div.innerHTML = `<img src="${url}"><span style="position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,.5);padding:1px 6px;border-radius:4px;font-size:11px">${p.tag}</span>`;
-          }).catch(() => { div.innerHTML = `<span>${p.tag}·加载失败</span>`; });
-        }
+      if (!records.length) {
+        el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3)">${emptyText || "今日暂无上报记录"}</div>`;
+        return;
       }
+      el.innerHTML = `
+      <div class="table-wrap"><table>
+        <thead><tr><th>日期</th><th>养护点</th><th>养护内容</th><th>数量</th><th>照片</th><th>审核状态</th><th>上传 / 审核时间</th><th>操作</th></tr></thead>
+        <tbody>${records.map(r=>`<tr>
+          <td>${esc(r.work_date || "")}</td>
+          <td>${esc(r.point_name || "—")}</td>
+          <td>${esc(r.care_name || "未命名养护")}</td>
+          <td>${r.quantity != null ? r.quantity + " " + esc(r.unit || "") : "—"}</td>
+          <td><div class="photo-grid" style="grid-template-columns:repeat(2,40px);gap:4px" data-thumbs="${r.id}"></div></td>
+          <td>
+            <span class="badge ${STATUS_BADGE[r.status]}">${STATUS_TEXT[r.status]}</span>
+            ${r.status === "rejected" && r.reject_reason ? `<div style="color:var(--red);font-size:12px;margin-top:4px">${esc(r.reject_reason)}</div>` : ""}
+          </td>
+          <td style="white-space:nowrap;color:var(--text3);font-size:12px">
+            ${fmtTime(r.created_at)}${r.reviewed_at ? `<br>审 ${fmtTime(r.reviewed_at)}` : ""}
+          </td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-sm" data-view="${r.id}">查看</button>
+            ${r.status !== "approved" ? `<button class="btn btn-sm" data-edit="${r.id}">编辑重报</button><button class="btn btn-sm btn-danger" data-del="${r.id}">删除</button>` : ""}
+          </td>
+        </tr>`).join("")}</tbody>
+      </table></div>`;
+      // 照片缩略图（前后各取一张）
+      for (const r of records) {
+        const box = $(`[data-thumbs="${r.id}"]`);
+        if (!box) continue;
+        const before = safeArr(r.photos_before).slice(0, 1).map(p=>({...p, tag:"前"}));
+        const after = safeArr(r.photos_after).slice(0, 1).map(p=>({...p, tag:"后"}));
+        const all = [...before, ...after];
+        if (!all.length) { box.outerHTML = `<span style="color:var(--text3);font-size:12px">无</span>`; continue; }
+        box.innerHTML = all.map(p=>`<div class="photo-box" data-k="${esc(p.key)}" title="${p.tag}照"><span>${p.tag}</span></div>`).join("");
+        $$(`[data-thumbs="${r.id}"] .photo-box[data-k]`).forEach(div => {
+          photoCache.get(div.dataset.k).then(url => { div.innerHTML = `<img src="${url}">`; }).catch(() => { div.innerHTML = `<span>×</span>`; });
+        });
+      }
+      attachPhotoZoom(el);
+      $$("[data-view]", el).forEach(b => b.onclick = () => showRecordDetail(records.find(x => x.id === b.dataset.view)));
       $$("[data-edit]", el).forEach(b => b.onclick = () => { const r = records.find(x=>x.id===b.dataset.edit); unit.openRecordForm(r); });
       $$("[data-del]", el).forEach(b => b.onclick = () => unit.deleteRecord(b.dataset.del));
     },
@@ -796,7 +843,7 @@ function renderUnit() {
         $(".main").innerHTML = `
         <div style="font-size:18px;font-weight:600;margin-bottom:16px">历史记录</div>
         <div id="unit-record-list"></div>`;
-        unit.renderRecordList(data.records);
+        unit.renderRecordList(data.records, "暂无历史记录");
       } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px;text-align:center">${esc(e.message)}</div>`; }
     },
   };
@@ -840,11 +887,14 @@ function renderPhotoThumb(grid, addBtn, key, tag, formState) {
   grid.insertBefore(div, addBtn);
   // 删除按钮走容器事件委托：图片加载完成后 innerHTML 会重绘，直接绑在按钮上会丢
   div.onclick = (e) => {
-    if (!e.target.closest(".del")) return;
-    e.preventDefault(); e.stopPropagation();
-    const idx = formState[tag].indexOf(key);
-    if (idx >= 0) formState[tag].splice(idx, 1);
-    div.remove();
+    if (e.target.closest(".del")) {
+      e.preventDefault(); e.stopPropagation();
+      const idx = formState[tag].indexOf(key);
+      if (idx >= 0) formState[tag].splice(idx, 1);
+      div.remove();
+      return;
+    }
+    if (e.target.tagName === "IMG") openPhotoViewer(key, tag === "before" ? "作业前照片" : "作业后照片");
   };
   photoCache.get(key).then(url => { div.innerHTML = `<img src="${url}"><button type="button" class="del">×</button>`; })
     .catch(() => { div.innerHTML = `<span>加载失败</span><button type="button" class="del">×</button>`; });
@@ -973,6 +1023,7 @@ function showRecordDetail(r) {
   $$("#rec-mask .photo-box[data-dk]").forEach(div => {
     photoCache.get(div.dataset.dk).then(url => { div.innerHTML = `<img src="${url}">`; }).catch(() => { div.innerHTML = "<span>加载失败</span>"; });
   });
+  attachPhotoZoom($("#rec-mask"));
 }
 
 function renderAdmin() {
@@ -1085,6 +1136,7 @@ function renderAdmin() {
             photoCache.get(div.dataset.k).then(url => { div.innerHTML = `<img src="${url}">`; }).catch(() => { div.innerHTML = `<span>×</span>`; });
           });
         }
+        attachPhotoZoom($("#rec-table"));
         $$("[data-detail]").forEach(b => b.onclick = () => ad.showRecordDetail(recs.find(x => x.id === b.dataset.detail)));
       } catch (e) { toast(e.message); }
     },
@@ -1556,6 +1608,7 @@ function renderReviewer() {
             photoCache.get(div.dataset.k).then(url => { div.innerHTML = `<img src="${url}">`; }).catch(() => { div.innerHTML = `<span>×</span>`; });
           });
         }
+        attachPhotoZoom(el);
         $$("[data-detail]", el).forEach(b => b.onclick = () => showRecordDetail(recs.find(x => x.id === b.dataset.detail)));
         $$("[data-approve]", el).forEach(b => b.onclick = () => rv.review(b.dataset.approve, "approve"));
         $$("[data-reject]", el).forEach(b => b.onclick = () => rv.rejectModal(b.dataset.reject));
