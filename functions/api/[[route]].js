@@ -785,6 +785,44 @@ async function adminRoute(path, method, request, env, user) {
     return json({ ok: true, storage: usage, records: total.c, users: users.c });
   }
 
+  // 养护成效总览（管理员全局查看，按日期/养护所/状态筛选）
+  if (path === "admin/records" && method === "GET") {
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    const office = url.searchParams.get("office");
+    const status = url.searchParams.get("status");
+    const where = ["1=1"]; const params = [];
+    if (from) { params.push(from); where.push("r.work_date >= ?" + params.length); }
+    if (to) { params.push(to); where.push("r.work_date <= ?" + params.length); }
+    if (office) { params.push(office); where.push("r.office_id = ?" + params.length); }
+    if (status) { params.push(status); where.push("r.status = ?" + params.length); }
+    const w = where.join(" AND ");
+
+    const rows = await env.DB.prepare(
+      `SELECT r.*, reg.name AS region_name, o.name AS office_name,
+              COALESCE(NULLIF(r.point_text,''), p.name) AS point_name,
+              u.display_name AS creator, rv.display_name AS reviewer
+         FROM daily_records r
+         LEFT JOIN offices o ON o.id = r.office_id
+         LEFT JOIN regions reg ON reg.id = o.region_id
+         LEFT JOIN points p ON p.id = r.point_id
+         LEFT JOIN users u ON u.id = r.created_by
+         LEFT JOIN users rv ON rv.id = r.reviewed_by
+        WHERE ${w}
+        ORDER BY r.work_date DESC, r.created_at DESC
+        LIMIT 500`
+    ).bind(...params).all();
+
+    const statRows = await env.DB.prepare(
+      `SELECT r.status, COUNT(*) c FROM daily_records r WHERE ${w} GROUP BY r.status`
+    ).bind(...params).all();
+
+    const stats = { pending: 0, approved: 0, rejected: 0 };
+    let total = 0;
+    for (const r of (statRows.results || [])) { stats[r.status] = r.c; total += r.c; }
+    return json({ ok: true, records: rows.results || [], stats, total });
+  }
+
   // 导出 CSV
   if (path === "admin/export-csv" && method === "GET") {
     return await exportCsv(env, url);

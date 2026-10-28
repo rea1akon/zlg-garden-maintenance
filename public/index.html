@@ -918,8 +918,9 @@ function renderAdmin() {
   const ad = {
     stateKey: "adminTab",
     render() {
-      state.adminTab = state.adminTab || "users";
+      state.adminTab = state.adminTab || "records";
       const navItems = [
+        { key: "records", label: "养护成效" },
         { key: "users", label: "账号配置" },
         { key: "region", label: "区域/养护所" },
         { key: "points", label: "养护点" },
@@ -931,10 +932,127 @@ function renderAdmin() {
       $("#app").innerHTML = layout(navItems, state.adminTab, "");
       bindNavAndLogout(ad);
       const fn = {
-        users: ad.loadUsers, region: ad.loadRegion, points: ad.loadPoints,
+        records: ad.loadRecords, users: ad.loadUsers, region: ad.loadRegion, points: ad.loadPoints,
         caretypes: ad.loadCareTypes, preset: ad.loadPreset, settings: ad.loadSettings, export: ad.loadExport,
       }[state.adminTab];
       fn.call(ad);
+    },
+    // ---------- 养护成效（管理员全局视图）----------
+    async loadRecords() {
+      $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
+      try {
+        const off = await api.get("offices");
+        ad._offices = off.offices || [];
+        if (!ad._recFilter) {
+          const d = new Date(); const p = n => String(n).padStart(2, "0");
+          ad._recFilter = { from: `${d.getFullYear()}-${p(d.getMonth()+1)}-01`, to: today(), office: "", status: "" };
+        }
+        const f = ad._recFilter;
+        $(".main").innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+          <div style="font-size:18px;font-weight:600">养护成效</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input class="input" id="rec-from" type="date" value="${f.from}" style="width:150px">
+            <span style="color:var(--text3)">至</span>
+            <input class="input" id="rec-to" type="date" value="${f.to}" style="width:150px">
+            <select class="input" id="rec-office" style="width:150px">
+              <option value="">全部养护所</option>
+              ${(ad._offices||[]).map(o=>`<option value="${o.id}" ${f.office===o.id?"selected":""}>${esc(o.name)}</option>`).join("")}
+            </select>
+            <select class="input" id="rec-status" style="width:120px">
+              ${[["","全部状态"],["pending","待审核"],["approved","已通过"],["rejected","已驳回"]].map(([v,t])=>`<option value="${v}" ${f.status===v?"selected":""}>${t}</option>`).join("")}
+            </select>
+            <button class="btn btn-primary btn-sm" id="rec-search">查询</button>
+          </div>
+        </div>
+        <div class="metrics" id="rec-metrics"></div>
+        <div id="rec-table"></div>`;
+        $("#rec-search").onclick = () => {
+          ad._recFilter = { from: $("#rec-from").value, to: $("#rec-to").value, office: $("#rec-office").value, status: $("#rec-status").value };
+          ad.fetchRecords();
+        };
+        await ad.fetchRecords();
+      } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px;text-align:center">${esc(e.message)}</div>`; }
+    },
+    async fetchRecords() {
+      const f = ad._recFilter || {};
+      const q = new URLSearchParams();
+      if (f.from) q.set("from", f.from);
+      if (f.to) q.set("to", f.to);
+      if (f.office) q.set("office", f.office);
+      if (f.status) q.set("status", f.status);
+      try {
+        const data = await api.get("admin/records?" + q.toString());
+        const s = data.stats || {};
+        $("#rec-metrics").innerHTML = `
+          <div class="metric"><div class="label">上报总数</div><div class="value" style="color:var(--green3)">${data.total || 0}</div></div>
+          <div class="metric"><div class="label">待审核</div><div class="value" style="color:var(--amber)">${s.pending || 0}</div></div>
+          <div class="metric"><div class="label">已通过</div><div class="value" style="color:var(--green3)">${s.approved || 0}</div></div>
+          <div class="metric"><div class="label">已驳回</div><div class="value" style="color:var(--red)">${s.rejected || 0}</div></div>`;
+        const recs = data.records || [];
+        if (!recs.length) {
+          $("#rec-table").innerHTML = `<div class="card" style="text-align:center;color:var(--text3)">该条件下暂无上报记录</div>`;
+          return;
+        }
+        $("#rec-table").innerHTML = `
+        <div class="table-wrap"><table>
+          <thead><tr><th>日期</th><th>区域</th><th>养护所</th><th>养护点</th><th>养护内容</th><th>数量</th><th>照片</th><th>状态</th><th>上报人</th><th>操作</th></tr></thead>
+          <tbody>${recs.map(r=>`<tr>
+            <td>${esc(r.work_date)}</td>
+            <td>${esc(r.region_name || "—")}</td>
+            <td>${esc(r.office_name || "—")}</td>
+            <td>${esc(r.point_name || "—")}</td>
+            <td>${esc(r.care_name || "—")}</td>
+            <td>${r.quantity != null ? r.quantity + " " + esc(r.unit || "") : "—"}</td>
+            <td><div class="photo-grid" style="grid-template-columns:repeat(2,40px);gap:4px" data-thumbs="${r.id}"></div></td>
+            <td><span class="badge ${STATUS_BADGE[r.status]}">${STATUS_TEXT[r.status]}</span></td>
+            <td>${esc(r.creator || "—")}</td>
+            <td><button class="btn btn-sm" data-detail="${r.id}">查看</button></td>
+          </tr>`).join("")}</tbody>
+        </table></div>
+        <div style="color:var(--text3);font-size:12px;margin-top:10px">共 ${data.total || 0} 条，列表最多显示最近 500 条；导出去「导出清理」页</div>`;
+        // 缩略图（前后各取一张）
+        for (const r of recs) {
+          const box = $(`[data-thumbs="${r.id}"]`);
+          if (!box) continue;
+          const before = safeArr(r.photos_before).slice(0, 1).map(p=>({...p, tag:"前"}));
+          const after = safeArr(r.photos_after).slice(0, 1).map(p=>({...p, tag:"后"}));
+          const all = [...before, ...after];
+          if (!all.length) { box.outerHTML = `<span style="color:var(--text3);font-size:12px">无</span>`; continue; }
+          box.innerHTML = all.map(p=>`<div class="photo-box" data-k="${esc(p.key)}" title="${p.tag}照"><span>${p.tag}</span></div>`).join("");
+          $$(`[data-thumbs="${r.id}"] .photo-box[data-k]`).forEach(div => {
+            photoCache.get(div.dataset.k).then(url => { div.innerHTML = `<img src="${url}">`; }).catch(() => { div.innerHTML = `<span>×</span>`; });
+          });
+        }
+        $$("[data-detail]").forEach(b => b.onclick = () => ad.showRecordDetail(recs.find(x => x.id === b.dataset.detail)));
+      } catch (e) { toast(e.message); }
+    },
+    showRecordDetail(r) {
+      if (!r) return;
+      const grid = (arr, tag) => arr.length
+        ? arr.map(p=>`<div class="photo-box" data-dk="${esc(p.key)}" style="width:104px;height:104px"><span>${tag}·加载中</span></div>`).join("")
+        : `<div style="color:var(--text3);font-size:12px">未上传</div>`;
+      $("#app").insertAdjacentHTML("beforeend", `
+      <div class="modal-mask" id="rec-mask"><div class="modal" style="max-width:720px;max-height:86vh;overflow:auto">
+        <div class="modal-title">养护成效详情</div>
+        <div style="font-size:13px;color:var(--text2);line-height:2;margin-bottom:14px">
+          <div>日期：${esc(r.work_date)}　状态：<span class="badge ${STATUS_BADGE[r.status]}">${STATUS_TEXT[r.status]}</span></div>
+          <div>区域 / 养护所：${esc(r.region_name || "—")} / ${esc(r.office_name || "—")}</div>
+          <div>养护点：${esc(r.point_name || "—")}</div>
+          <div>养护内容：${esc(r.care_name || "—")}${r.quantity != null ? `　数量：${r.quantity} ${esc(r.unit || "")}` : ""}</div>
+          <div>上报人：${esc(r.creator || "—")}　上传时间：${fmtTime(r.created_at)}</div>
+          ${r.reviewer ? `<div>审核人：${esc(r.reviewer)}　审核时间：${fmtTime(r.reviewed_at)}</div>` : ""}
+          ${r.description ? `<div>备注：${esc(r.description)}</div>` : ""}
+          ${r.reject_reason ? `<div style="color:var(--red)">驳回原因：${esc(r.reject_reason)}</div>` : ""}
+        </div>
+        <div class="form-group"><label>作业前照片</label><div class="photo-grid">${grid(safeArr(r.photos_before), "前")}</div></div>
+        <div class="form-group"><label>作业后照片</label><div class="photo-grid">${grid(safeArr(r.photos_after), "后")}</div></div>
+        <button class="btn btn-block" id="rec-close">关闭</button>
+      </div></div>`);
+      $("#rec-close").onclick = () => $("#rec-mask").remove();
+      $$("#rec-mask .photo-box[data-dk]").forEach(div => {
+        photoCache.get(div.dataset.dk).then(url => { div.innerHTML = `<img src="${url}">`; }).catch(() => { div.innerHTML = "<span>加载失败</span>"; });
+      });
     },
     async loadUsers() {
       $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
