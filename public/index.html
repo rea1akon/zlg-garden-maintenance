@@ -153,6 +153,8 @@ label { font-size: 13px; color: var(--text2); display: block; margin-bottom: 6px
 .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .table-wrap table { min-width: 560px; }
+/* 记录类表格列多，窄屏改为横向滚动而不是压缩换行 */
+.table-wrap table.rec-table { min-width: 1180px; }
 
 /* 筛选栏 */
 .filter-bar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
@@ -608,7 +610,7 @@ function renderUnit() {
         return;
       }
       el.innerHTML = `
-      <div class="table-wrap"><table>
+      <div class="table-wrap"><table class="rec-table">
         <thead><tr><th>日期</th><th>养护点</th><th>养护内容</th><th>数量</th><th>照片</th><th>审核状态</th><th>上传 / 审核时间</th><th>操作</th></tr></thead>
         <tbody>${records.map(r=>`<tr>
           <td>${esc(r.work_date || "")}</td>
@@ -1026,6 +1028,46 @@ function showRecordDetail(r) {
   attachPhotoZoom($("#rec-mask"));
 }
 
+// 删除记录：必须输入本人登录密码二次确认（考核员 / 管理员共用）
+function confirmDeleteRecord(record, onDone) {
+  if (!record) return;
+  const label = [record.work_date, record.office_name, record.point_name || "未指定养护点", record.care_name]
+    .filter(Boolean).map(x => esc(x)).join(" · ");
+  $("#app").insertAdjacentHTML("beforeend", `
+  <div class="modal-mask" id="del-mask"><div class="modal" style="max-width:460px">
+    <div class="modal-title">删除记录</div>
+    <div style="background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.8;margin-bottom:14px">
+      <div style="color:var(--text)">${label}</div>
+      <div style="color:var(--red);margin-top:6px">记录与关联照片会一并删除，不可恢复。</div>
+    </div>
+    <div class="form-group"><label>请输入 ${esc(state.user?.display_name || "")} 的登录密码</label>
+      <input class="input" type="password" id="del-pwd" placeholder="登录密码" autocomplete="current-password">
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-danger" style="flex:1" id="del-confirm">确认删除</button>
+      <button class="btn" style="flex:1" id="del-cancel">取消</button>
+    </div>
+  </div></div>`);
+  const close = () => $("#del-mask")?.remove();
+  $("#del-cancel").onclick = close;
+  $("#del-pwd").onkeydown = e => { if (e.key === "Enter") $("#del-confirm").click(); };
+  setTimeout(() => $("#del-pwd")?.focus(), 50);
+  $("#del-confirm").onclick = async () => {
+    const pwd = $("#del-pwd").value;
+    if (!pwd) return toast("请输入登录密码");
+    const btn = $("#del-confirm");
+    btn.disabled = true; btn.textContent = "删除中…";
+    try {
+      await api.post(`review/records/${record.id}/delete`, { password: pwd });
+      close(); toast("已删除");
+      onDone && onDone();
+    } catch (e) {
+      btn.disabled = false; btn.textContent = "确认删除";
+      toast(e.message);
+    }
+  };
+}
+
 function renderAdmin() {
   const ad = {
     stateKey: "adminTab",
@@ -1057,13 +1099,14 @@ function renderAdmin() {
         ad._offices = off.offices || [];
         if (!ad._recFilter) {
           const d = new Date(); const p = n => String(n).padStart(2, "0");
-          ad._recFilter = { from: `${d.getFullYear()}-${p(d.getMonth()+1)}-01`, to: today(), office: "", status: "" };
+          ad._recFilter = { q: "", from: `${d.getFullYear()}-${p(d.getMonth()+1)}-01`, to: today(), office: "", status: "" };
         }
         const f = ad._recFilter;
         $(".main").innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
           <div style="font-size:18px;font-weight:600">养护成效</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input class="input" id="rec-q" placeholder="搜索养护点 / 养护内容 / 上报人" value="${esc(f.q || "")}" style="width:230px">
             <input class="input" id="rec-from" type="date" value="${f.from}" style="width:150px">
             <span style="color:var(--text3)">至</span>
             <input class="input" id="rec-to" type="date" value="${f.to}" style="width:150px">
@@ -1075,13 +1118,21 @@ function renderAdmin() {
               ${[["","全部状态"],["pending","待审核"],["approved","已通过"],["rejected","已驳回"]].map(([v,t])=>`<option value="${v}" ${f.status===v?"selected":""}>${t}</option>`).join("")}
             </select>
             <button class="btn btn-primary btn-sm" id="rec-search">查询</button>
+            <button class="btn btn-sm" id="rec-reset">重置</button>
           </div>
         </div>
         <div class="metrics" id="rec-metrics"></div>
         <div id="rec-table"></div>`;
-        $("#rec-search").onclick = () => {
-          ad._recFilter = { from: $("#rec-from").value, to: $("#rec-to").value, office: $("#rec-office").value, status: $("#rec-status").value };
+        const doSearch = () => {
+          ad._recFilter = { q: $("#rec-q").value.trim(), from: $("#rec-from").value, to: $("#rec-to").value, office: $("#rec-office").value, status: $("#rec-status").value };
           ad.fetchRecords();
+        };
+        $("#rec-search").onclick = doSearch;
+        $("#rec-q").onkeydown = e => { if (e.key === "Enter") doSearch(); };
+        $("#rec-reset").onclick = () => {
+          const d = new Date(); const p = n => String(n).padStart(2, "0");
+          ad._recFilter = { q: "", from: `${d.getFullYear()}-${p(d.getMonth()+1)}-01`, to: today(), office: "", status: "" };
+          ad.loadRecords();
         };
         await ad.fetchRecords();
       } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px;text-align:center">${esc(e.message)}</div>`; }
@@ -1089,6 +1140,7 @@ function renderAdmin() {
     async fetchRecords() {
       const f = ad._recFilter || {};
       const q = new URLSearchParams();
+      if (f.q) q.set("q", f.q);
       if (f.from) q.set("from", f.from);
       if (f.to) q.set("to", f.to);
       if (f.office) q.set("office", f.office);
@@ -1107,7 +1159,7 @@ function renderAdmin() {
           return;
         }
         $("#rec-table").innerHTML = `
-        <div class="table-wrap"><table>
+        <div class="table-wrap"><table class="rec-table">
           <thead><tr><th>日期</th><th>区域</th><th>养护所</th><th>养护点</th><th>养护内容</th><th>数量</th><th>照片</th><th>状态</th><th>上报人</th><th>操作</th></tr></thead>
           <tbody>${recs.map(r=>`<tr>
             <td>${esc(r.work_date)}</td>
@@ -1119,7 +1171,10 @@ function renderAdmin() {
             <td><div class="photo-grid" style="grid-template-columns:repeat(2,40px);gap:4px" data-thumbs="${r.id}"></div></td>
             <td><span class="badge ${STATUS_BADGE[r.status]}">${STATUS_TEXT[r.status]}</span></td>
             <td>${esc(r.creator || "—")}</td>
-            <td><button class="btn btn-sm" data-detail="${r.id}">查看</button></td>
+            <td style="white-space:nowrap">
+              <button class="btn btn-sm" data-detail="${r.id}">查看</button>
+              <button class="btn btn-sm btn-danger" data-delrec="${r.id}">删除</button>
+            </td>
           </tr>`).join("")}</tbody>
         </table></div>
         <div style="color:var(--text3);font-size:12px;margin-top:10px">共 ${data.total || 0} 条，列表最多显示最近 500 条；导出去「导出清理」页</div>`;
@@ -1138,6 +1193,7 @@ function renderAdmin() {
         }
         attachPhotoZoom($("#rec-table"));
         $$("[data-detail]").forEach(b => b.onclick = () => ad.showRecordDetail(recs.find(x => x.id === b.dataset.detail)));
+        $$("[data-delrec]").forEach(b => b.onclick = () => confirmDeleteRecord(recs.find(x => x.id === b.dataset.delrec), () => ad.fetchRecords()));
       } catch (e) { toast(e.message); }
     },
     showRecordDetail(r) { showRecordDetail(r); },
@@ -1535,28 +1591,42 @@ function renderReviewer() {
     },
     async loadList() {
       const isPending = state.rvTab === "pending";
-      rv._f = rv._f || { status: "", from: "", to: "" };
+      rv._f = rv._f || { q: "", status: "", office: "", from: "", to: "" };
       $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
       try {
         const q = new URLSearchParams();
         if (isPending) q.set("status", "pending");
-        else { if (rv._f.status) q.set("status", rv._f.status); if (rv._f.from) q.set("from", rv._f.from); if (rv._f.to) q.set("to", rv._f.to); }
-        const [records, stats] = await Promise.all([
+        else {
+          if (rv._f.q) q.set("q", rv._f.q);
+          if (rv._f.status) q.set("status", rv._f.status);
+          if (rv._f.office) q.set("office", rv._f.office);
+          if (rv._f.from) q.set("from", rv._f.from);
+          if (rv._f.to) q.set("to", rv._f.to);
+        }
+        const [records, stats, offices] = await Promise.all([
           api.get("review/records?" + q.toString()),
           api.get("review/stats"),
+          api.get("offices"),
         ]);
+        rv._offices = offices.offices || [];
         const s = stats.stats;
         $(".main").innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
           <div style="font-size:18px;font-weight:600">${isPending ? "待审核记录" : "全部记录"}</div>
           ${isPending ? "" : `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <select class="input" id="rv-status" style="width:130px">
+            <input class="input" id="rv-q" placeholder="搜索养护点 / 养护内容 / 上报人" value="${esc(rv._f.q || "")}" style="width:230px">
+            <select class="input" id="rv-office" style="width:140px">
+              <option value="">全部养护所</option>
+              ${(rv._offices || []).map(o=>`<option value="${o.id}" ${rv._f.office===o.id?"selected":""}>${esc(o.name)}</option>`).join("")}
+            </select>
+            <select class="input" id="rv-status" style="width:120px">
               ${[["","全部状态"],["pending","待审核"],["approved","已通过"],["rejected","已驳回"]].map(([v,t])=>`<option value="${v}" ${rv._f.status===v?"selected":""}>${t}</option>`).join("")}
             </select>
             <input class="input" id="rv-from" type="date" value="${rv._f.from}" style="width:150px">
             <span style="color:var(--text3)">至</span>
             <input class="input" id="rv-to" type="date" value="${rv._f.to}" style="width:150px">
             <button class="btn btn-primary btn-sm" id="rv-search">查询</button>
+            <button class="btn btn-sm" id="rv-reset">重置</button>
           </div>`}
         </div>
         <div class="metrics">
@@ -1566,17 +1636,22 @@ function renderReviewer() {
         </div>
         <div id="rv-list"></div>`;
         const el = $("#rv-list");
-        if ($("#rv-search")) $("#rv-search").onclick = () => {
-          rv._f = { status: $("#rv-status").value, from: $("#rv-from").value, to: $("#rv-to").value };
-          rv.loadList();
-        };
+        if ($("#rv-search")) {
+          const doSearch = () => {
+            rv._f = { q: $("#rv-q").value.trim(), status: $("#rv-status").value, office: $("#rv-office").value, from: $("#rv-from").value, to: $("#rv-to").value };
+            rv.loadList();
+          };
+          $("#rv-search").onclick = doSearch;
+          $("#rv-q").onkeydown = e => { if (e.key === "Enter") doSearch(); };
+          $("#rv-reset").onclick = () => { rv._f = { q: "", status: "", office: "", from: "", to: "" }; rv.loadList(); };
+        }
         const recs = records.records || [];
         if (!recs.length) {
           el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3)">${isPending ? "暂无待审核记录" : "该条件下暂无记录"}</div>`;
           return;
         }
         el.innerHTML = `
-        <div class="table-wrap"><table>
+        <div class="table-wrap"><table class="rec-table">
           <thead><tr><th>日期</th><th>区域</th><th>养护所</th><th>养护点</th><th>养护内容</th><th>数量</th><th>照片</th><th>状态</th><th>上报人</th><th>操作</th></tr></thead>
           <tbody>${recs.map(r=>`<tr>
             <td>${esc(r.work_date)}</td>
@@ -1591,6 +1666,7 @@ function renderReviewer() {
             <td style="white-space:nowrap">
               <button class="btn btn-sm" data-detail="${r.id}">查看</button>
               ${r.status === "pending" ? `<button class="btn btn-sm btn-primary" data-approve="${r.id}">通过</button><button class="btn btn-sm btn-danger" data-reject="${r.id}">驳回</button>` : ""}
+              <button class="btn btn-sm btn-danger" data-delrec="${r.id}">删除</button>
             </td>
           </tr>`).join("")}</tbody>
         </table></div>
@@ -1610,6 +1686,7 @@ function renderReviewer() {
         }
         attachPhotoZoom(el);
         $$("[data-detail]", el).forEach(b => b.onclick = () => showRecordDetail(recs.find(x => x.id === b.dataset.detail)));
+        $$("[data-delrec]", el).forEach(b => b.onclick = () => confirmDeleteRecord(recs.find(x => x.id === b.dataset.delrec), () => rv.loadList()));
         $$("[data-approve]", el).forEach(b => b.onclick = () => rv.review(b.dataset.approve, "approve"));
         $$("[data-reject]", el).forEach(b => b.onclick = () => rv.rejectModal(b.dataset.reject));
       } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px;text-align:center">${esc(e.message)}</div>`; }

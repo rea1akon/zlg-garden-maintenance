@@ -594,6 +594,17 @@ async function deleteRecord(env, user, id) {
   return json({ ok: true });
 }
 
+// 强制删除（考核员 / 管理员使用，前端已要求输入登录密码确认）：不限审核状态
+async function hardDeleteRecord(env, user, id) {
+  const existing = await env.DB.prepare("SELECT * FROM daily_records WHERE id = ?1").bind(id).first();
+  if (!existing) return fail("记录不存在", 404);
+  if (!(await officeInScope(env, user, existing.office_id))) return fail("无权限", 403);
+  const keys = collectPhotoKeys(existing);
+  for (const k of keys) await photoRemove(env, k);
+  await env.DB.prepare("DELETE FROM daily_records WHERE id = ?1").bind(id).run();
+  return json({ ok: true, id });
+}
+
 function collectPhotoKeys(record) {
   const keys = [];
   for (const field of ["photos_before", "photos_after"]) {
@@ -630,13 +641,14 @@ async function uploadPhoto(request, env, user) {
 async function reviewRoute(path, method, request, env, user) {
   const url = new URL(request.url);
 
-  // 审核记录列表：status 缺省/为空/all 表示全部状态；另支持 date/from/to/office
+  // 审核记录列表：status 缺省/为空/all 表示全部状态；另支持 date/from/to/office/q（模糊搜索）
   if (path === "review/records" && method === "GET") {
     const status = url.searchParams.get("status") || "";
     const date = url.searchParams.get("date");
     const from = url.searchParams.get("from");
     const to = url.searchParams.get("to");
     const office = url.searchParams.get("office");
+    const q = (url.searchParams.get("q") || "").trim();
     const filter = scopeOfficeFilter(user, "r.");
     const where = [filter.where];
     const params = [...filter.params];
@@ -645,6 +657,14 @@ async function reviewRoute(path, method, request, env, user) {
     if (from) { params.push(from); where.push("r.work_date >= ?" + params.length); }
     if (to) { params.push(to); where.push("r.work_date <= ?" + params.length); }
     if (office) { params.push(office); where.push("r.office_id = ?" + params.length); }
+    if (q) {
+      params.push("%" + q + "%");
+      const n = params.length;
+      // 模糊匹配：养护点（手填/字典）、养护内容、上报人、区域/养护所名称
+      where.push(`(IFNULL(p.name,'') LIKE ?${n} OR IFNULL(r.point_text,'') LIKE ?${n}
+                   OR IFNULL(r.care_name,'') LIKE ?${n} OR IFNULL(u.display_name,'') LIKE ?${n}
+                   OR IFNULL(o.name,'') LIKE ?${n} OR IFNULL(reg.name,'') LIKE ?${n})`);
+    }
     const sql = `SELECT r.*, reg.name AS region_name, o.name AS office_name,
                         COALESCE(NULLIF(r.point_text,''), p.name) AS point_name,
                         u.display_name AS creator_name, rv.display_name AS reviewer_name
@@ -658,6 +678,17 @@ async function reviewRoute(path, method, request, env, user) {
                   ORDER BY r.created_at DESC LIMIT 500`;
     const rows = await env.DB.prepare(sql).bind(...params).all();
     return json({ ok: true, records: rows.results });
+  }
+
+  // 删除记录（考核员 / 管理员）：需重新输入本人登录密码确认，允许删除任意状态
+  if (path.startsWith("review/records/") && path.endsWith("/delete") && method === "POST") {
+    const id = path.replace("review/records/", "").replace("/delete", "");
+    const { password } = await request.json().catch(() => ({}));
+    const cur = await env.DB.prepare("SELECT password_hash FROM users WHERE id = ?1").bind(user.id).first();
+    if (!cur || !password || !(await verifyPassword(String(password), cur.password_hash))) {
+      return fail("密码错误，删除已取消", 403);
+    }
+    return await hardDeleteRecord(env, user, id);
   }
 
   // 通过
@@ -805,22 +836,31 @@ async function adminRoute(path, method, request, env, user) {
     const to = url.searchParams.get("to");
     const office = url.searchParams.get("office");
     const status = url.searchParams.get("status");
+    const q = (url.searchParams.get("q") || "").trim();
     const where = ["1=1"]; const params = [];
     if (from) { params.push(from); where.push("r.work_date >= ?" + params.length); }
     if (to) { params.push(to); where.push("r.work_date <= ?" + params.length); }
     if (office) { params.push(office); where.push("r.office_id = ?" + params.length); }
     if (status) { params.push(status); where.push("r.status = ?" + params.length); }
+    if (q) {
+      params.push("%" + q + "%");
+      const n = params.length;
+      where.push(`(IFNULL(p.name,'') LIKE ?${n} OR IFNULL(r.point_text,'') LIKE ?${n}
+                   OR IFNULL(r.care_name,'') LIKE ?${n} OR IFNULL(u.display_name,'') LIKE ?${n}
+                   OR IFNULL(o.name,'') LIKE ?${n} OR IFNULL(reg.name,'') LIKE ?${n})`);
+    }
     const w = where.join(" AND ");
+    const joins = `FROM daily_records r
+         LEFT JOIN offices o ON o.id = r.office_id
+         LEFT JOIN regions reg ON reg.id = o.region_id
+         LEFT JOIN points p ON p.id = r.point_id
+         LEFT JOIN users u ON u.id = r.created_by`;
 
     const rows = await env.DB.prepare(
       `SELECT r.*, reg.name AS region_name, o.name AS office_name,
               COALESCE(NULLIF(r.point_text,''), p.name) AS point_name,
               u.display_name AS creator, rv.display_name AS reviewer
-         FROM daily_records r
-         LEFT JOIN offices o ON o.id = r.office_id
-         LEFT JOIN regions reg ON reg.id = o.region_id
-         LEFT JOIN points p ON p.id = r.point_id
-         LEFT JOIN users u ON u.id = r.created_by
+         ${joins}
          LEFT JOIN users rv ON rv.id = r.reviewed_by
         WHERE ${w}
         ORDER BY r.work_date DESC, r.created_at DESC
@@ -828,7 +868,7 @@ async function adminRoute(path, method, request, env, user) {
     ).bind(...params).all();
 
     const statRows = await env.DB.prepare(
-      `SELECT r.status, COUNT(*) c FROM daily_records r WHERE ${w} GROUP BY r.status`
+      `SELECT r.status, COUNT(*) c ${joins} WHERE ${w} GROUP BY r.status`
     ).bind(...params).all();
 
     const stats = { pending: 0, approved: 0, rejected: 0 };
