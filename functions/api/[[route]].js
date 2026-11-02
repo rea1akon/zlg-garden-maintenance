@@ -498,10 +498,14 @@ async function unitRoute(path, method, request, env, user) {
     return json({ ok: true, offices: rows.results });
   }
 
-  // 记录列表
+  // 记录列表（支持 date / from / to / status / q 模糊搜索）
   if (path === "records" && method === "GET") {
     const date = url.searchParams.get("date");
     const pointId = url.searchParams.get("point_id");
+    const status = url.searchParams.get("status");
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    const q = (url.searchParams.get("q") || "").trim();
     const filter = scopeOfficeFilter(user, "r.");
     let sql = `SELECT r.*, reg.name AS region_name, o.name AS office_name,
                       COALESCE(NULLIF(r.point_text,''), p.name) AS point_name
@@ -513,6 +517,16 @@ async function unitRoute(path, method, request, env, user) {
     const params = [...filter.params];
     if (date) { sql += " AND r.work_date = ?" + (params.length + 1); params.push(date); }
     if (pointId) { sql += " AND r.point_id = ?" + (params.length + 1); params.push(pointId); }
+    if (status && status !== "all") { sql += " AND r.status = ?" + (params.length + 1); params.push(status); }
+    if (from) { sql += " AND r.work_date >= ?" + (params.length + 1); params.push(from); }
+    if (to) { sql += " AND r.work_date <= ?" + (params.length + 1); params.push(to); }
+    if (q) {
+      params.push("%" + q + "%");
+      const n = params.length;
+      // 模糊匹配：养护点（字典/手填）、养护内容、备注
+      sql += ` AND (IFNULL(p.name,'') LIKE ?${n} OR IFNULL(r.point_text,'') LIKE ?${n}
+                OR IFNULL(r.care_name,'') LIKE ?${n} OR IFNULL(r.description,'') LIKE ?${n})`;
+    }
     sql += " ORDER BY r.created_at DESC LIMIT 500";
     const rows = await env.DB.prepare(sql).bind(...params).all();
     return json({ ok: true, records: rows.results });

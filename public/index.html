@@ -155,6 +155,8 @@ label { font-size: 13px; color: var(--text2); display: block; margin-bottom: 6px
 .table-wrap table { min-width: 560px; }
 /* 记录类表格列多，窄屏改为横向滚动而不是压缩换行 */
 .table-wrap table.rec-table { min-width: 1180px; }
+.table-wrap table.unit-rec { min-width: 1180px; }
+.nowrap { white-space: nowrap; }
 
 /* 筛选栏 */
 .filter-bar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
@@ -576,10 +578,12 @@ function renderUnit() {
     async renderReport() {
       $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
       try {
-        const [careTypes, points, todayRecords] = await Promise.all([
-          api.get("care-types"), api.get("points"), api.get("records?date=" + today()),
+        const [careTypes, points, todayRecords, rejected] = await Promise.all([
+          api.get("care-types"), api.get("points"), api.get("records?date=" + today()), api.get("records?status=rejected"),
         ]);
         unit._careTypes = careTypes.careTypes; unit._points = points.points; unit._todayRecords = todayRecords.records;
+        // 待重报：被驳回且不在今日列表里的（跨天遗留），今日的驳回记录在下方表格里已可直接处理
+        unit._todos = (rejected.records || []).filter(r => r.work_date !== today());
         const grouped = {};
         for (const r of todayRecords.records) {
           if (!grouped[r.point_id || r.office_id]) grouped[r.point_id || r.office_id] = [];
@@ -597,10 +601,52 @@ function renderUnit() {
           <div class="metric"><div class="label">已通过</div><div class="value" style="color:var(--green3)">${todayRecords.records.filter(r=>r.status==='approved').length}</div></div>
           <div class="metric"><div class="label">已驳回</div><div class="value" style="color:var(--red)">${todayRecords.records.filter(r=>r.status==='rejected').length}</div></div>
         </div>
+        ${unit.renderTodoPanel()}
         <div id="unit-record-list"></div>`;
         $("#new-record-btn").onclick = () => unit.openRecordForm(null);
+        $$("[data-retry]").forEach(b => b.onclick = () => {
+          const r = (unit._todos || []).find(x => x.id === b.dataset.retry);
+          if (r) unit.openRecordForm(r);
+        });
+        $$("[data-todo-view]").forEach(b => b.onclick = () => showRecordDetail((unit._todos || []).find(x => x.id === b.dataset.todoView)));
+        if ($("#todo-more")) $("#todo-more").onclick = () => {
+          unit._hf = { q: "", status: "rejected", from: "", to: "" };
+          state.unitTab = "history";
+          unit.render();
+        };
         unit.renderRecordList(todayRecords.records);
       } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px;text-align:center">${esc(e.message)}</div>`; }
+    },
+    // 待重报面板：跨天未处理的驳回记录
+    renderTodoPanel() {
+      const list = unit._todos || [];
+      if (!list.length) return "";
+      const shown = list.slice(0, 5);
+      return `
+      <div class="card" style="border-color:rgba(239,68,68,.45);margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+          <div style="font-weight:600;color:var(--red)">待重报 · ${list.length} 条被驳回</div>
+          <div class="time-tag">修改并重新提交后，会重新进入待审核</div>
+        </div>
+        ${shown.map(r => `
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;padding:10px 0;border-top:1px solid var(--border)">
+          <div style="flex:1 1 240px;min-width:0">
+            <div style="font-size:13px">
+              ${esc(r.work_date)} · ${esc(r.point_name || "未指定养护点")} ·
+              <b>${esc(r.care_name || "未命名养护")}</b>
+              ${r.quantity != null ? `　${r.quantity} ${esc(r.unit || "")}` : ""}
+            </div>
+            <div style="color:var(--red);font-size:12px;margin-top:3px">驳回原因：${esc(r.reject_reason || "未填写")}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn btn-sm" data-todo-view="${r.id}">查看</button>
+            <button class="btn btn-sm btn-primary" data-retry="${r.id}">编辑重报</button>
+          </div>
+        </div>`).join("")}
+        ${list.length > shown.length ? `<div style="padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)">
+          还有 ${list.length - shown.length} 条，<a href="javascript:void(0)" id="todo-more" style="color:var(--green3)">去历史记录按「已驳回」查看</a>
+        </div>` : ""}
+      </div>`;
     },
     renderRecordList(records, emptyText) {
       const el = $("#unit-record-list");
@@ -610,13 +656,13 @@ function renderUnit() {
         return;
       }
       el.innerHTML = `
-      <div class="table-wrap"><table class="rec-table">
+      <div class="table-wrap"><table class="rec-table unit-rec">
         <thead><tr><th>日期</th><th>养护点</th><th>养护内容</th><th>数量</th><th>照片</th><th>审核状态</th><th>上传 / 审核时间</th><th>操作</th></tr></thead>
         <tbody>${records.map(r=>`<tr>
-          <td>${esc(r.work_date || "")}</td>
+          <td class="nowrap">${esc(r.work_date || "")}</td>
           <td>${esc(r.point_name || "—")}</td>
           <td>${esc(r.care_name || "未命名养护")}</td>
-          <td>${r.quantity != null ? r.quantity + " " + esc(r.unit || "") : "—"}</td>
+          <td class="nowrap">${r.quantity != null ? r.quantity + " " + esc(r.unit || "") : "—"}</td>
           <td><div class="photo-grid" style="grid-template-columns:repeat(2,40px);gap:4px" data-thumbs="${r.id}"></div></td>
           <td>
             <span class="badge ${STATUS_BADGE[r.status]}">${STATUS_TEXT[r.status]}</span>
@@ -839,14 +885,44 @@ function renderUnit() {
       try { await api.del("records/" + id); toast("已删除"); unit.render(); } catch (e) { toast(e.message); }
     },
     async renderHistory() {
-      $(".main").innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px">加载中…</div>`;
+      unit._hf = unit._hf || { q: "", status: "", from: "", to: "" };
+      const f = unit._hf;
+      $(".main").innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <div style="font-size:18px;font-weight:600">历史记录</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input class="input" id="uh-q" placeholder="搜索养护点 / 养护内容" value="${esc(f.q || "")}" style="width:210px">
+          <select class="input" id="uh-status" style="width:120px">
+            ${[["","全部状态"],["pending","待审核"],["approved","已通过"],["rejected","已驳回"]].map(([v,t])=>`<option value="${v}" ${f.status===v?"selected":""}>${t}</option>`).join("")}
+          </select>
+          <input class="input" id="uh-from" type="date" value="${f.from}" style="width:150px">
+          <span style="color:var(--text3)">至</span>
+          <input class="input" id="uh-to" type="date" value="${f.to}" style="width:150px">
+          <button class="btn btn-primary btn-sm" id="uh-search">查询</button>
+          <button class="btn btn-sm" id="uh-reset">重置</button>
+        </div>
+      </div>
+      <div id="unit-record-list"><div style="text-align:center;color:var(--text2);padding:32px">加载中…</div></div>`;
+      const doSearch = () => {
+        unit._hf = { q: $("#uh-q").value.trim(), status: $("#uh-status").value, from: $("#uh-from").value, to: $("#uh-to").value };
+        unit.fetchHistory();
+      };
+      $("#uh-search").onclick = doSearch;
+      $("#uh-q").onkeydown = e => { if (e.key === "Enter") doSearch(); };
+      $("#uh-reset").onclick = () => { unit._hf = { q: "", status: "", from: "", to: "" }; unit.renderHistory(); };
+      await unit.fetchHistory();
+    },
+    async fetchHistory() {
+      const f = unit._hf || {};
+      const qs = new URLSearchParams();
+      if (f.q) qs.set("q", f.q);
+      if (f.status) qs.set("status", f.status);
+      if (f.from) qs.set("from", f.from);
+      if (f.to) qs.set("to", f.to);
       try {
-        const data = await api.get("records");
-        $(".main").innerHTML = `
-        <div style="font-size:18px;font-weight:600;margin-bottom:16px">历史记录</div>
-        <div id="unit-record-list"></div>`;
-        unit.renderRecordList(data.records, "暂无历史记录");
-      } catch (e) { $(".main").innerHTML = `<div style="color:var(--red);padding:40px;text-align:center">${esc(e.message)}</div>`; }
+        const data = await api.get("records?" + qs.toString());
+        unit.renderRecordList(data.records, (f.q || f.status || f.from || f.to) ? "没有符合条件的记录，试试调整筛选条件" : "暂无历史记录");
+      } catch (e) { $("#unit-record-list").innerHTML = `<div style="color:var(--red);padding:32px;text-align:center">${esc(e.message)}</div>`; }
     },
   };
   unit.render();
@@ -1162,7 +1238,7 @@ function renderAdmin() {
         <div class="table-wrap"><table class="rec-table">
           <thead><tr><th>日期</th><th>区域</th><th>养护所</th><th>养护点</th><th>养护内容</th><th>数量</th><th>照片</th><th>状态</th><th>上报人</th><th>操作</th></tr></thead>
           <tbody>${recs.map(r=>`<tr>
-            <td>${esc(r.work_date)}</td>
+            <td class="nowrap">${esc(r.work_date)}</td>
             <td>${esc(r.region_name || "—")}</td>
             <td>${esc(r.office_name || "—")}</td>
             <td>${esc(r.point_name || "—")}</td>
@@ -1654,7 +1730,7 @@ function renderReviewer() {
         <div class="table-wrap"><table class="rec-table">
           <thead><tr><th>日期</th><th>区域</th><th>养护所</th><th>养护点</th><th>养护内容</th><th>数量</th><th>照片</th><th>状态</th><th>上报人</th><th>操作</th></tr></thead>
           <tbody>${recs.map(r=>`<tr>
-            <td>${esc(r.work_date)}</td>
+            <td class="nowrap">${esc(r.work_date)}</td>
             <td>${esc(r.region_name || "—")}</td>
             <td>${esc(r.office_name || "—")}</td>
             <td>${esc(r.point_name || "—")}</td>
