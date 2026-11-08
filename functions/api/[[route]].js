@@ -677,7 +677,8 @@ async function reviewRoute(path, method, request, env, user) {
       const n = params.length;
       // 模糊匹配：养护点（手填/字典）、养护内容、上报人、区域/养护所名称
       where.push(`(IFNULL(p.name,'') LIKE ?${n} OR IFNULL(r.point_text,'') LIKE ?${n}
-                   OR IFNULL(r.care_name,'') LIKE ?${n} OR IFNULL(u.display_name,'') LIKE ?${n}
+                   OR IFNULL(r.care_name,'') LIKE ?${n} OR IFNULL(r.description,'') LIKE ?${n}
+                   OR IFNULL(u.display_name,'') LIKE ?${n}
                    OR IFNULL(o.name,'') LIKE ?${n} OR IFNULL(reg.name,'') LIKE ?${n})`);
     }
     const sql = `SELECT r.*, reg.name AS region_name, o.name AS office_name,
@@ -861,7 +862,8 @@ async function adminRoute(path, method, request, env, user) {
       params.push("%" + q + "%");
       const n = params.length;
       where.push(`(IFNULL(p.name,'') LIKE ?${n} OR IFNULL(r.point_text,'') LIKE ?${n}
-                   OR IFNULL(r.care_name,'') LIKE ?${n} OR IFNULL(u.display_name,'') LIKE ?${n}
+                   OR IFNULL(r.care_name,'') LIKE ?${n} OR IFNULL(r.description,'') LIKE ?${n}
+                   OR IFNULL(u.display_name,'') LIKE ?${n}
                    OR IFNULL(o.name,'') LIKE ?${n} OR IFNULL(reg.name,'') LIKE ?${n})`);
     }
     const w = where.join(" AND ");
