@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS daily_records (
   quantity      REAL,                         -- 数量
   unit          TEXT,                         -- 单位快照
   description   TEXT,                         -- 备注 / 其他内容
+  weather       TEXT,                         -- 当日天气（晴/多云/阴/小雨…）
   photos_before TEXT NOT NULL DEFAULT '[]',   -- JSON [{key,size,width,height,origSize}]
   photos_after  TEXT NOT NULL DEFAULT '[]',
   status        TEXT NOT NULL DEFAULT 'pending', -- 'pending'|'approved'|'rejected'

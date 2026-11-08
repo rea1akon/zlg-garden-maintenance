@@ -154,9 +154,13 @@ label { font-size: 13px; color: var(--text2); display: block; margin-bottom: 6px
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .table-wrap table { min-width: 560px; }
 /* 记录类表格列多，窄屏改为横向滚动而不是压缩换行 */
-.table-wrap table.rec-table { min-width: 1180px; }
+.table-wrap table.rec-table { min-width: 1260px; }
 .table-wrap table.unit-rec { min-width: 1180px; }
 .nowrap { white-space: nowrap; }
+/* 操作列吸右：窄屏横向滚动时按钮始终可见 */
+.rec-table th:last-child, .rec-table td:last-child { position: sticky; right: 0; z-index: 1; background: var(--card); }
+.rec-table th:last-child { background: var(--bg2); }
+.rec-table tbody tr:hover td:last-child { background: var(--card); }
 
 /* 筛选栏 */
 .filter-bar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
@@ -285,6 +289,7 @@ function today() {
   const d = new Date(); const p = n => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
 }
+const WEATHERS = ["晴", "多云", "阴", "小雨", "中雨", "大雨", "雷阵雨", "雪", "雨夹雪", "雾", "霾", "台风"];
 const STATUS_TEXT = { pending: "待审核", approved: "已通过", rejected: "已驳回" };
 const STATUS_BADGE = { pending: "badge-pending", approved: "badge-approved", rejected: "badge-rejected" };
 const ROLE_TEXT = { admin: "管理员", reviewer: "考核员", unit: "养护单位" };
@@ -657,12 +662,13 @@ function renderUnit() {
       }
       el.innerHTML = `
       <div class="table-wrap"><table class="rec-table unit-rec">
-        <thead><tr><th>日期</th><th>养护点</th><th>养护内容</th><th>数量</th><th>照片</th><th>审核状态</th><th>上传 / 审核时间</th><th>操作</th></tr></thead>
+        <thead><tr><th>日期</th><th>养护点</th><th>养护内容</th><th>数量</th><th>天气</th><th>照片</th><th>审核状态</th><th>上传 / 审核时间</th><th>操作</th></tr></thead>
         <tbody>${records.map(r=>`<tr>
           <td class="nowrap">${esc(r.work_date || "")}</td>
           <td>${esc(r.point_name || "—")}</td>
           <td>${esc(r.care_name || "未命名养护")}</td>
           <td class="nowrap">${r.quantity != null ? r.quantity + " " + esc(r.unit || "") : "—"}</td>
+          <td class="nowrap">${esc(r.weather || "—")}</td>
           <td><div class="photo-grid" style="grid-template-columns:repeat(2,40px);gap:4px" data-thumbs="${r.id}"></div></td>
           <td>
             <span class="badge ${STATUS_BADGE[r.status]}">${STATUS_TEXT[r.status]}</span>
@@ -720,6 +726,12 @@ function renderUnit() {
           </div>
           <div style="color:var(--text3);font-size:12px;margin-top:6px">可输入关键词筛选；列表里没有的养护点，输入名称后会自动按「其他」保存</div>
         </div>
+        <div class="form-group"><label>当日天气</label>
+          <select class="input" id="care-weather">
+            <option value="">请选择（可不填）</option>
+            ${WEATHERS.map(w=>`<option value="${w}">${w}</option>`).join("")}
+          </select>
+        </div>
         <div class="form-group"><label>备注</label><textarea class="input" id="care-desc" placeholder="补充说明（可选）"></textarea></div>
         <div class="form-group"><label>作业前照片</label><div class="photo-grid" id="before-grid"><div class="photo-box" id="before-add">+ 拍照/选图</div></div></div>
         <div class="form-group"><label>作业后照片</label><div class="photo-grid" id="after-grid"><div class="photo-box" id="after-add">+ 拍照/选图</div></div></div>
@@ -729,8 +741,9 @@ function renderUnit() {
         careTypeId: record?.care_type_id || "", careTypeUnit: record?.unit || "",
         careName: record?.care_name || "", pointId: record?.point_id || "",
         before: safeArr(record?.photos_before).map(p=>p.key), after: safeArr(record?.photos_after).map(p=>p.key),
-        quantity: record?.quantity ?? null, desc: record?.description || "",
+        quantity: record?.quantity ?? null, desc: record?.description || "", weather: record?.weather || "",
       };
+      $("#care-weather").value = record?.weather || "";
       $("#back-btn").onclick = () => unit.render();
       // 养护内容搜索下拉（对应后台「养护内容字典」，支持关键词搜索 + 键盘上下选择）
       const search = $("#care-search"), dropdown = $("#care-dropdown"), unitInput = $("#care-unit");
@@ -871,6 +884,7 @@ function renderUnit() {
         quantity: qty,
         unit: $("#care-unit").value || null,
         description: $("#care-desc").value || null,
+        weather: $("#care-weather").value || null,
         photos_before: f.before.map(k=>({key:k})),
         photos_after: f.after.map(k=>({key:k})),
       };
@@ -1087,7 +1101,7 @@ function showRecordDetail(r) {
       <div>日期：${esc(r.work_date)}　状态：<span class="badge ${STATUS_BADGE[r.status]}">${STATUS_TEXT[r.status]}</span></div>
       <div>区域 / 养护所：${esc(r.region_name || "—")} / ${esc(r.office_name || "—")}</div>
       <div>养护点：${esc(r.point_name || "—")}</div>
-      <div>养护内容：${esc(r.care_name || "—")}${r.quantity != null ? `　数量：${r.quantity} ${esc(r.unit || "")}` : ""}</div>
+      <div>养护内容：${esc(r.care_name || "—")}${r.quantity != null ? `　数量：${r.quantity} ${esc(r.unit || "")}` : ""}${r.weather ? `　天气：${esc(r.weather)}` : ""}</div>
       <div>上报人：${esc(creator)}　上传时间：${fmtTime(r.created_at)}</div>
       ${reviewer ? `<div>审核人：${esc(reviewer)}　审核时间：${r.reviewed_at ? fmtTime(r.reviewed_at) : "—"}</div>` : ""}
       ${r.description ? `<div>备注：${esc(r.description)}</div>` : ""}
@@ -1236,14 +1250,15 @@ function renderAdmin() {
         }
         $("#rec-table").innerHTML = `
         <div class="table-wrap"><table class="rec-table">
-          <thead><tr><th>日期</th><th>区域</th><th>养护所</th><th>养护点</th><th>养护内容</th><th>数量</th><th>照片</th><th>状态</th><th>上报人</th><th>操作</th></tr></thead>
+          <thead><tr><th>日期</th><th>区域</th><th>养护所</th><th>养护点</th><th>养护内容</th><th>数量</th><th>天气</th><th>照片</th><th>状态</th><th>上报人</th><th>操作</th></tr></thead>
           <tbody>${recs.map(r=>`<tr>
             <td class="nowrap">${esc(r.work_date)}</td>
             <td>${esc(r.region_name || "—")}</td>
             <td>${esc(r.office_name || "—")}</td>
             <td>${esc(r.point_name || "—")}</td>
             <td>${esc(r.care_name || "—")}</td>
-            <td>${r.quantity != null ? r.quantity + " " + esc(r.unit || "") : "—"}</td>
+            <td class="nowrap">${r.quantity != null ? r.quantity + " " + esc(r.unit || "") : "—"}</td>
+            <td class="nowrap">${esc(r.weather || "—")}</td>
             <td><div class="photo-grid" style="grid-template-columns:repeat(2,40px);gap:4px" data-thumbs="${r.id}"></div></td>
             <td><span class="badge ${STATUS_BADGE[r.status]}">${STATUS_TEXT[r.status]}</span></td>
             <td>${esc(r.creator || "—")}</td>
@@ -1728,14 +1743,15 @@ function renderReviewer() {
         }
         el.innerHTML = `
         <div class="table-wrap"><table class="rec-table">
-          <thead><tr><th>日期</th><th>区域</th><th>养护所</th><th>养护点</th><th>养护内容</th><th>数量</th><th>照片</th><th>状态</th><th>上报人</th><th>操作</th></tr></thead>
+          <thead><tr><th>日期</th><th>区域</th><th>养护所</th><th>养护点</th><th>养护内容</th><th>数量</th><th>天气</th><th>照片</th><th>状态</th><th>上报人</th><th>操作</th></tr></thead>
           <tbody>${recs.map(r=>`<tr>
             <td class="nowrap">${esc(r.work_date)}</td>
             <td>${esc(r.region_name || "—")}</td>
             <td>${esc(r.office_name || "—")}</td>
             <td>${esc(r.point_name || "—")}</td>
             <td>${esc(r.care_name || "—")}</td>
-            <td>${r.quantity != null ? r.quantity + " " + esc(r.unit || "") : "—"}</td>
+            <td class="nowrap">${r.quantity != null ? r.quantity + " " + esc(r.unit || "") : "—"}</td>
+            <td class="nowrap">${esc(r.weather || "—")}</td>
             <td><div class="photo-grid" style="grid-template-columns:repeat(2,40px);gap:4px" data-thumbs="${r.id}"></div></td>
             <td><span class="badge ${STATUS_BADGE[r.status]}">${STATUS_TEXT[r.status]}</span></td>
             <td>${esc(r.creator_name || "—")}</td>

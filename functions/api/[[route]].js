@@ -554,7 +554,7 @@ async function saveRecord(request, env, user, recordId) {
   const body = await request.json().catch(() => ({}));
   const {
     office_id, point_id, point_text, work_date, care_type_id, care_name, quantity, unit,
-    description, photos_before, photos_after,
+    description, weather, photos_before, photos_after,
   } = body;
 
   // 养护单位只能报自己范围
@@ -567,6 +567,7 @@ async function saveRecord(request, env, user, recordId) {
   // 养护点"其他"：手填的名称优先，此时不关联 points 表
   const pointText = String(point_text || "").trim().slice(0, 80) || null;
   const pointId = pointText ? null : (point_id || null);
+  const weatherText = String(weather || "").trim().slice(0, 12) || null;
 
   const pb = JSON.stringify(photos_before || []);
   const pa = JSON.stringify(photos_after || []);
@@ -580,19 +581,19 @@ async function saveRecord(request, env, user, recordId) {
     await env.DB.prepare(
       `UPDATE daily_records SET office_id=?1, point_id=?2, point_text=?3, care_type_id=?4, care_name=?5,
         quantity=?6, unit=?7, description=?8, photos_before=?9, photos_after=?10, status='pending',
-        reject_reason=NULL, updated_at=?11 WHERE id=?12`
+        reject_reason=NULL, weather=?11, updated_at=?12 WHERE id=?13`
     ).bind(office_id, pointId, pointText, care_type_id || null, care_name || null, quantity || null,
-      unit || null, description || null, pb, pa, now(), recordId).run();
+      unit || null, description || null, pb, pa, weatherText, now(), recordId).run();
     return json({ ok: true, id: recordId });
   }
 
   const id = crypto.randomUUID();
   await env.DB.prepare(
     `INSERT INTO daily_records (id, office_id, point_id, point_text, work_date, care_type_id, care_name, quantity,
-      unit, description, photos_before, photos_after, status, created_by, created_at, updated_at)
-     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,'pending',?13,?14,?14)`
+      unit, description, weather, photos_before, photos_after, status, created_by, created_at, updated_at)
+     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,'pending',?14,?15,?15)`
   ).bind(id, office_id, pointId, pointText, work_date, care_type_id || null, care_name || null,
-    quantity || null, unit || null, description || null, pb, pa, user.id, now()).run();
+    quantity || null, unit || null, description || null, weatherText, pb, pa, user.id, now()).run();
   return json({ ok: true, id });
 }
 
@@ -1041,7 +1042,7 @@ async function exportCsv(env, url) {
 
   let sql = `SELECT r.work_date, reg.name AS region_name, o.name AS office_name,
              COALESCE(NULLIF(r.point_text,''), p.name) AS point_name,
-             r.care_name, r.quantity, r.unit, r.description, r.status, r.reject_reason,
+             r.care_name, r.quantity, r.unit, r.weather, r.description, r.status, r.reject_reason,
              u.display_name AS creator, r.created_at, rv.display_name AS reviewer, r.reviewed_at
              FROM daily_records r
              LEFT JOIN offices o ON o.id = r.office_id
@@ -1057,7 +1058,7 @@ async function exportCsv(env, url) {
   sql += " ORDER BY r.work_date, o.name, r.created_at";
 
   const rows = await env.DB.prepare(sql).bind(...params).all();
-  const header = ["作业日期", "区域", "养护所", "养护点", "养护内容", "数量", "单位", "备注", "状态", "驳回原因", "上报人", "上传时间", "审核人", "审核时间"];
+  const header = ["作业日期", "区域", "养护所", "养护点", "养护内容", "数量", "单位", "天气", "备注", "状态", "驳回原因", "上报人", "上传时间", "审核人", "审核时间"];
   const esc = (v) => {
     if (v === null || v === undefined) return "";
     const s = String(v);
@@ -1068,7 +1069,7 @@ async function exportCsv(env, url) {
   for (const r of rows.results) {
     lines.push([
       r.work_date, r.region_name, r.office_name, r.point_name, r.care_name,
-      r.quantity, r.unit, r.description, r.status, r.reject_reason,
+      r.quantity, r.unit, r.weather, r.description, r.status, r.reject_reason,
       r.creator, r.created_at, r.reviewer, r.reviewed_at,
     ].map(esc).join(","));
   }
