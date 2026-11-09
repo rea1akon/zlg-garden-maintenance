@@ -568,7 +568,7 @@ async function saveRecord(request, env, user, recordId) {
   const pointText = String(point_text || "").trim().slice(0, 80) || null;
   const pointId = pointText ? null : (point_id || null);
   const weatherText = String(weather || "").trim().slice(0, 12) || null;
-  if (!weatherText) return fail("请选择当日天气", 400);
+  if (!recordId && !weatherText) return fail("请选择当日天气", 400); // 旧记录编辑豁免（只对新提交强制）
 
   const pb = JSON.stringify(photos_before || []);
   const pa = JSON.stringify(photos_after || []);
@@ -582,7 +582,7 @@ async function saveRecord(request, env, user, recordId) {
     await env.DB.prepare(
       `UPDATE daily_records SET office_id=?1, point_id=?2, point_text=?3, care_type_id=?4, care_name=?5,
         quantity=?6, unit=?7, description=?8, photos_before=?9, photos_after=?10, status='pending',
-        reject_reason=NULL, weather=?11, updated_at=?12 WHERE id=?13`
+        reject_reason=NULL, weather=COALESCE(?11, weather), updated_at=?12 WHERE id=?13`
     ).bind(office_id, pointId, pointText, care_type_id || null, care_name || null, quantity || null,
       unit || null, description || null, pb, pa, weatherText, now(), recordId).run();
     return json({ ok: true, id: recordId });

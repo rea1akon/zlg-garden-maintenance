@@ -726,8 +726,8 @@ function renderUnit() {
           </div>
           <div style="color:var(--text3);font-size:12px;margin-top:6px">可输入关键词筛选；列表里没有的养护点，输入名称后会自动按「其他」保存</div>
         </div>
-        <div class="form-group"><label>当日天气 <span style="color:var(--red)">*</span></label>
-          <select class="input" id="care-weather" required>
+        <div class="form-group"><label>当日天气${isEdit ? "" : ` <span style="color:var(--red)">*</span>`}</label>
+          <select class="input" id="care-weather">
             <option value="">下拉选择</option>
             ${WEATHERS.map(w=>`<option value="${w}">${w}</option>`).join("")}
           </select>
@@ -871,7 +871,7 @@ function renderUnit() {
       const careTypeId = f.careTypeId;
       const qty = $("#care-qty").value === "" ? null : parseFloat($("#care-qty").value);
       if (!careTypeId && !careName) return toast("请选择或填写养护内容");
-      if (!$("#care-weather").value) { $("#care-weather").focus(); return toast("请选择当日天气"); }
+      if (!isEdit && !$("#care-weather").value) { $("#care-weather").focus(); return toast("请选择当日天气"); }
       if (!f.before.length && !f.after.length) return toast("请至少上传一张作业照片");
       const pointId = f.pointId || null;
       const pointText = pointId ? null : ($("#point-search").value.trim() || null);
