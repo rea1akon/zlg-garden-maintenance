@@ -568,6 +568,7 @@ async function saveRecord(request, env, user, recordId) {
   const pointText = String(point_text || "").trim().slice(0, 80) || null;
   const pointId = pointText ? null : (point_id || null);
   const weatherText = String(weather || "").trim().slice(0, 12) || null;
+  if (!weatherText) return fail("请选择当日天气", 400);
 
   const pb = JSON.stringify(photos_before || []);
   const pa = JSON.stringify(photos_after || []);
